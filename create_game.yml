@@ -1,0 +1,68 @@
+name: Create Lichess game
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: create-game
+  cancel-in-progress: true
+
+jobs:
+  create_game:
+    runs-on: ubuntu-latest
+    env:
+      BRANCH: ${{ github.ref_name }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Ensure data folder exists
+        run: mkdir -p data
+
+      - name: Sanitize tokens
+        run: |
+          echo "LICHESS_HUMAN_TOKEN=$(printf '%s' '${{ secrets.LICHESS_HUMAN_TOKEN }}' | tr -d '\r\n')" >> $GITHUB_ENV
+          echo "LICHESS_BOT_TOKEN=$(printf '%s' '${{ secrets.LICHESS_BOT_TOKEN }}' | tr -d '\r\n')" >> $GITHUB_ENV
+          echo "LICHESS_BOT_USERNAME=$(printf '%s' '${{ secrets.LICHESS_BOT_USERNAME }}' | tr -d '\r\n')" >> $GITHUB_ENV
+
+      - name: Create game
+        env:
+          LICHESS_HUMAN_TOKEN: ${{ env.LICHESS_HUMAN_TOKEN }}
+          LICHESS_BOT_TOKEN: ${{ env.LICHESS_BOT_TOKEN }}
+          LICHESS_BOT_USERNAME: ${{ env.LICHESS_BOT_USERNAME }}
+        run: python 01_create_game.py
+
+      - name: Debug data dir
+        run: |
+          ls -la
+          ls -la data || true
+          echo "game_id:"; test -f data/game_id.txt && cat data/game_id.txt || echo "missing"
+          echo "fen:"; test -f data/position.fen && head -n1 data/position.fen || echo "missing"
+          echo "last:"; test -f data/dernier_coup.json && cat data/dernier_coup.json || echo "missing"
+
+      - name: Commit & push game data
+        run: |
+          git config user.name "${{ github.actor }}"
+          git config user.email "${{ github.actor }}@users.noreply.github.com"
+          git fetch origin "$BRANCH"
+          git pull --rebase origin "$BRANCH" || true
+          git add -f data/game_id.txt data/position.fen data/dernier_coup.json || true
+          git commit -m "Init game data" || echo "No changes"
+          git push origin HEAD:"$BRANCH"
