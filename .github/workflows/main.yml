@@ -3,9 +3,6 @@ name: Main
 on:
   workflow_dispatch:
 
-permissions:
-  contents: write
-
 jobs:
   process_comments_white:
     runs-on: ubuntu-latest
@@ -29,17 +26,9 @@ jobs:
           LICHESS_HUMAN_TOKEN: ${{ secrets.LICHESS_HUMAN_TOKEN }}
         run: |
           python 03_process_comments.py
-        continue-on-error: true  # ⬅ empêche l'échec du job si aucun commentaire
+        continue-on-error: true  # ⬅ N'interrompt pas le workflow si aucun commentaire
 
       - name: Play white move
         run: |
           python 04_play_white.py
-        continue-on-error: true  # ⬅ idem, si le coup est vide ça ne bloque pas
-
-      - name: Commit and push changes
-        run: |
-          git config user.name "github-actions"
-          git config user.email "actions@github.com"
-          git add data/coup_blanc.txt
-          git commit -m "♟️ Coup blanc joué" || echo "Rien à committer"
-          git push
+        continue-on-error: true  # ⬅ N'interrompt pas si le coup est vide
