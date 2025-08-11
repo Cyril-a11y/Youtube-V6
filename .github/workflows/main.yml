@@ -7,7 +7,7 @@ permissions:
   contents: write  # Autorise les push vers le dépôt
 
 jobs:
-  process_comments_white:
+  process_and_play:
     runs-on: ubuntu-latest
 
     steps:
@@ -25,7 +25,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      # 4. Lancer le script de récupération et sélection du coup blanc
+      # 4. Récupérer et sélectionner le coup blanc
       - name: Process comments and select white move
         env:
           YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
@@ -35,8 +35,8 @@ jobs:
           python 03_process_comments.py
         continue-on-error: true
 
-      # 5. Commit et push du coup blanc choisi
-      - name: Commit and push coup_blanc.txt
+      # 5. Commit et push coup_blanc.txt
+      - name: Commit coup_blanc.txt
         run: |
           git config --global user.name "github-actions"
           git config --global user.email "actions@github.com"
@@ -44,8 +44,27 @@ jobs:
           git commit -m "Update coup_blanc.txt [skip ci]" || echo "No changes to commit"
           git push
 
-      # 6. Jouer le coup blanc sur Lichess
+      # 6. Jouer le coup blanc
       - name: Play white move
+        env:
+          LICHESS_HUMAN_TOKEN: ${{ secrets.LICHESS_HUMAN_TOKEN }}
         run: |
           python 04_play_white.py
         continue-on-error: true
+
+      # 7. Jouer le coup noir (Stockfish bot)
+      - name: Play black move
+        env:
+          LICHESS_BOT_TOKEN: ${{ secrets.LICHESS_BOT_TOKEN }}
+        run: |
+          python 05_play_black.py
+        continue-on-error: true
+
+      # 8. Commit et push tous les fichiers mis à jour
+      - name: Commit updated game data
+        run: |
+          git config --global user.name "github-actions"
+          git config --global user.email "actions@github.com"
+          git add data/position.fen data/dernier_coup.json data/move_history.json || true
+          git commit -m "Update game state after moves [skip ci]" || echo "No changes to commit"
+          git push
