@@ -93,10 +93,6 @@ def recuperer_commentaires(video_id, max_results=100, apres=None):
 def _sans_accents(s: str) -> str:
     return "".join(c for c in unicodedata.normalize("NFD", s) if unicodedata.category(c) != "Mn")
 
-# -----------------------
-# Normalisation du texte
-# -----------------------
-
 def nettoyer_et_corriger_san(commentaire: str) -> str:
     raw = commentaire.strip()
     raw = (raw.replace("×", "x")
@@ -122,12 +118,7 @@ def nettoyer_et_corriger_san(commentaire: str) -> str:
 
     if re.fullmatch(r"[a-h][1-8][QRBNqrbn]", cleaned):
         cleaned = f"{cleaned[:2]}={cleaned[2:]}"
-
     return cleaned
-
-# -----------------------
-# Parsing des coups
-# -----------------------
 
 UCI_REGEX = re.compile(r"^[a-h][1-8][a-h][1-8][qrbn]?$")
 
@@ -176,17 +167,16 @@ def choisir_coup_majoritaire(coups_uci):
         print("❌ Aucun coup majoritaire possible (liste vide)")
         return None
     coup, nb = Counter(coups_uci).most_common(1)[0]
-    print(f"🏆 Coup majoritaire: {coup} ({nb} votes)")
+    print(f"🏆 Coup majoritaire: {coup} ({nb} vote(s))")
     return coup
 
 def sauvegarder_coup_blanc(coup_uci: str | None):
     COUP_BLANCS_FILE.parent.mkdir(parents=True, exist_ok=True)
-    COUP_BLANCS_FILE.write_text(coup_uci or "", encoding="utf-8")
-    print(f"💾 coup_blanc.txt mis à jour: '{coup_uci or ''}'")
-
-# -----------------------
-# Lichess
-# -----------------------
+    if coup_uci:
+        COUP_BLANCS_FILE.write_text(coup_uci, encoding="utf-8")
+        print(f"💾 coup_blanc.txt mis à jour: '{coup_uci}'")
+    else:
+        print("⚠️ Aucun coup à sauvegarder, fichier non modifié.")
 
 def fetch_current_fen_from_lichess(game_id):
     url = f"https://lichess.org/game/export/{game_id}?fen=1"
@@ -203,7 +193,9 @@ def fetch_current_fen_from_lichess(game_id):
         print(f"❌ Erreur API Lichess : {r.status_code} {r.text}")
         return None
     data = r.json()
-    return data.get("fen")
+    fen = data.get("fen")
+    print(f"📌 FEN récupérée : {fen}")
+    return fen
 
 # -----------------------
 # Main
@@ -217,18 +209,18 @@ if __name__ == "__main__":
 
         if not commentaires:
             print("⛔ Aucun commentaire récupéré")
-            sauvegarder_coup_blanc("")
-            sys.exit(0)  # pas d'erreur
+            sauvegarder_coup_blanc(None)
+            sys.exit(0)
 
         game_id = load_game_id()
         if not game_id:
-            sauvegarder_coup_blanc("")
+            sauvegarder_coup_blanc(None)
             sys.exit(0)
 
         fen = fetch_current_fen_from_lichess(game_id)
         if not fen:
             print("⛔ Impossible de récupérer la FEN")
-            sauvegarder_coup_blanc("")
+            sauvegarder_coup_blanc(None)
             sys.exit(0)
 
         board = chess.Board(fen)
@@ -237,11 +229,10 @@ if __name__ == "__main__":
 
         sauvegarder_coup_blanc(coup_choisi_uci)
         print("=== FIN DU SCRIPT ===")
-        # sortie normale => code 0
     except Exception as e:
         print(f"⚠️ Erreur non bloquante: {e}")
         try:
-            sauvegarder_coup_blanc("")
+            sauvegarder_coup_blanc(None)
         except Exception:
             pass
         sys.exit(0)
