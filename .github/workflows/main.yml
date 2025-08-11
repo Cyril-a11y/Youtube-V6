@@ -29,10 +29,12 @@ jobs:
           LICHESS_HUMAN_TOKEN: ${{ secrets.LICHESS_HUMAN_TOKEN }}
         run: |
           python 03_process_comments.py
+        continue-on-error: true  # ⬅ empêche l'échec du job si aucun commentaire
 
       - name: Play white move
         run: |
           python 04_play_white.py
+        continue-on-error: true  # ⬅ idem, si le coup est vide ça ne bloque pas
 
       - name: Commit and push changes
         run: |
