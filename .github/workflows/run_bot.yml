@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write   # ⬅ nécessaire pour commit/push
 
 concurrency:
   group: run-bot
@@ -16,7 +16,7 @@ jobs:
     timeout-minutes: 360
 
     steps:
-      - name: Checkout (optional)
+      - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
@@ -37,7 +37,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pip-lichess-bot-
 
-      - name: Install engine + deps (one-time per job)
+      - name: Install engine + deps
         run: |
           sudo apt-get update
           sudo apt-get install -y stockfish jq
@@ -54,18 +54,26 @@ jobs:
       - name: Vérification du nom du bot
         run: |
           set -e
+          mkdir -p data
           echo "Vérification du nom du bot via l'API Lichess..."
           BOT_NAME=$(curl -s -H "Authorization: Bearer $LICHESS_BOT_TOKEN" https://lichess.org/api/account | jq -r '.username')
-          echo "$BOT_NAME" > bot_name.txt
-          echo "🔎 Nom renvoyé par Lichess (stocké dans bot_name.txt)"
-          cat bot_name.txt
+          echo "$BOT_NAME" > data/bot_name.txt
+          echo "🔎 Nom renvoyé par Lichess: '$BOT_NAME'"
           if [ "$BOT_NAME" != "PriseEnPassantBot" ]; then
             echo "❌ ERREUR : Le token n'appartient pas au compte attendu."
-            echo "ℹ️  Nom trouvé: $BOT_NAME"
+            echo "ℹ️  Nom trouvé: '$BOT_NAME'"
             echo "💡 Vérifie que tu utilises le token API du bon compte bot."
             exit 1
           fi
           echo "✅ Nom correct : $BOT_NAME"
+
+      - name: Commit bot_name.txt
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add data/bot_name.txt
+          git commit -m "Ajout du nom du bot détecté" || echo "Aucun changement"
+          git push
 
       - name: Write debug config.yml
         run: |
@@ -86,7 +94,7 @@ jobs:
             rated: false
             variants: [standard]
             time_controls: [unlimited, correspondence]
-            log_moves: true
+            log_moves: true    # ✅ Log des coups joués
 
           challenge:
             allow_bot: false
