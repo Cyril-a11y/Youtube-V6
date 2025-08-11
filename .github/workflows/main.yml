@@ -3,22 +3,29 @@ name: Main
 on:
   workflow_dispatch:
 
+permissions:
+  contents: write  # Autorise les push vers le dépôt
+
 jobs:
   process_comments_white:
     runs-on: ubuntu-latest
 
     steps:
+      # 1. Récupérer le code du dépôt
       - uses: actions/checkout@v4
 
+      # 2. Installer Python
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
+      # 3. Installer les dépendances
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      # 4. Lancer le script de récupération et sélection du coup blanc
       - name: Process comments and select white move
         env:
           YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
@@ -26,9 +33,19 @@ jobs:
           LICHESS_HUMAN_TOKEN: ${{ secrets.LICHESS_HUMAN_TOKEN }}
         run: |
           python 03_process_comments.py
-        continue-on-error: true  # ⬅ N'interrompt pas le workflow si aucun commentaire
+        continue-on-error: true
 
+      # 5. Commit et push du coup blanc choisi
+      - name: Commit and push coup_blanc.txt
+        run: |
+          git config --global user.name "github-actions"
+          git config --global user.email "actions@github.com"
+          git add data/coup_blanc.txt
+          git commit -m "Update coup_blanc.txt [skip ci]" || echo "No changes to commit"
+          git push
+
+      # 6. Jouer le coup blanc sur Lichess
       - name: Play white move
         run: |
           python 04_play_white.py
-        continue-on-error: true  # ⬅ N'interrompt pas si le coup est vide
+        continue-on-error: true
