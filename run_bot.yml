@@ -1,0 +1,97 @@
+name: Run Lichess Bot
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: run-bot
+  cancel-in-progress: false
+
+jobs:
+  bot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360   # ~6h max Actions
+
+    steps:
+      - name: Checkout (optional)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Clone lichess-bot
+        run: git clone https://github.com/lichess-bot-devs/lichess-bot.git
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Cache pip (lichess-bot)
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-lichess-bot-${{ hashFiles('lichess-bot/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-lichess-bot-
+
+      - name: Install engine + deps (one-time per job)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y stockfish
+          python -m pip install --upgrade pip
+          pip install -r lichess-bot/requirements.txt
+          which stockfish
+          stockfish --version
+
+      - name: Sanitize secrets
+        run: |
+          echo "LICHESS_BOT_TOKEN=$(printf '%s' '${{ secrets.LICHESS_BOT_TOKEN }}' | tr -d '\r\n')" >> $GITHUB_ENV
+          echo "LICHESS_BOT_USERNAME=$(printf '%s' '${{ secrets.LICHESS_BOT_USERNAME }}' | tr -d '\r\n')" >> $GITHUB_ENV
+
+      - name: Write minimal config.yml
+        run: |
+          mkdir -p lichess-bot
+          cat > lichess-bot/config.yml <<'YML'
+          token: "${LICHESS_BOT_TOKEN}"
+
+          engine:
+            name: stockfish
+            protocol: uci
+            cmd: /usr/bin/stockfish
+            ponder: false
+            uci_options:
+              Threads: 2
+              Hash: 128
+
+          play:
+            rated: false
+            variants: [standard]
+            time_controls: [unlimited, correspondence]
+
+          challenge:
+            allow_bot: false
+            max_concurrent: 2
+
+          abort_time: 20
+          YML
+
+          echo "== config.yml head =="
+          head -n 40 lichess-bot/config.yml | sed 's/token:.*/token: ****/'
+
+      # 🚀 Lance le bot en boucle : s’il quitte, on redémarre après 10s
+      - name: Run lichess-bot (auto-restart)
+        working-directory: lichess-bot
+        env:
+          LICHESS_BOT_TOKEN: ${{ env.LICHESS_BOT_TOKEN }}
+          LICHESS_BOT_USERNAME: ${{ env.LICHESS_BOT_USERNAME }}
+        run: |
+          set -e
+          while true; do
+            echo "== Starting lichess-bot =="
+            python lichess-bot.py -v || true
+            echo "== Bot exited (code=$?). Restarting in 10s =="
+            sleep 10
+          done
