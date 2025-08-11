@@ -208,18 +208,18 @@ if __name__ == "__main__":
     if not commentaires:
         print("⛔ Aucun commentaire récupéré")
         sauvegarder_coup_blanc("")
-        exit(1)
+        exit(0)  # pas d'erreur
 
     game_id = load_game_id()
     if not game_id:
         sauvegarder_coup_blanc("")
-        exit(1)
+        exit(0)
 
     fen = fetch_current_fen_from_lichess(game_id)
     if not fen:
         print("⛔ Impossible de récupérer la FEN")
         sauvegarder_coup_blanc("")
-        exit(1)
+        exit(0)
 
     board = chess.Board(fen)
     coups_valides_uci = extraire_coups_valides(board, commentaires)
