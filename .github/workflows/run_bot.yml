@@ -1,4 +1,4 @@
-name: Run Lichess Bot
+name: Run Lichess Bot (Debug)
 
 on:
   workflow_dispatch:
@@ -13,7 +13,7 @@ concurrency:
 jobs:
   bot:
     runs-on: ubuntu-latest
-    timeout-minutes: 360   # ~6h max Actions
+    timeout-minutes: 360
 
     steps:
       - name: Checkout (optional)
@@ -51,7 +51,7 @@ jobs:
           echo "LICHESS_BOT_TOKEN=$(printf '%s' '${{ secrets.LICHESS_BOT_TOKEN }}' | tr -d '\r\n')" >> $GITHUB_ENV
           echo "LICHESS_BOT_USERNAME=$(printf '%s' '${{ secrets.LICHESS_BOT_USERNAME }}' | tr -d '\r\n')" >> $GITHUB_ENV
 
-      - name: Write minimal config.yml
+      - name: Write debug config.yml
         run: |
           mkdir -p lichess-bot
           cat > lichess-bot/config.yml <<'YML'
@@ -70,6 +70,7 @@ jobs:
             rated: false
             variants: [standard]
             time_controls: [unlimited, correspondence]
+            log_moves: true    # ✅ Log des coups joués
 
           challenge:
             allow_bot: false
@@ -81,8 +82,8 @@ jobs:
           echo "== config.yml head =="
           head -n 40 lichess-bot/config.yml | sed 's/token:.*/token: ****/'
 
-      # 🚀 Lance le bot en boucle : s’il quitte, on redémarre après 10s
-      - name: Run lichess-bot (auto-restart)
+      # 🚀 Lance le bot en mode debug + affiche tous les événements
+      - name: Run lichess-bot in verbose debug mode
         working-directory: lichess-bot
         env:
           LICHESS_BOT_TOKEN: ${{ env.LICHESS_BOT_TOKEN }}
@@ -90,8 +91,8 @@ jobs:
         run: |
           set -e
           while true; do
-            echo "== Starting lichess-bot =="
-            python lichess-bot.py -v || true
+            echo "== Starting lichess-bot with DEBUG logging =="
+            python lichess-bot.py -vv --logfile /dev/stdout || true
             echo "== Bot exited (code=$?). Restarting in 10s =="
             sleep 10
           done
