@@ -31,6 +31,7 @@ DATA_DIR.mkdir(parents=True, exist_ok=True)
 GAME_ID_FILE = DATA_DIR / "game_id.txt"
 POSITION_FILE = DATA_DIR / "position.fen"
 LAST_MOVE_FILE = DATA_DIR / "dernier_coup.json"
+COUP_BLANCS_FILE = DATA_DIR / "coup_blanc.txt"
 
 def creer_defi_illimite():
     """Crée un défi sans limite de temps / correspondance."""
@@ -56,6 +57,19 @@ def accepter_defi_bot(challenge_id):
         raise SystemExit(f"Acceptation KO: {r.status_code} {r.text}")
     print("Bot a accepté le défi.")
 
+def recuperer_fen_initiale(game_id):
+    """Récupère la FEN actuelle de la partie créée."""
+    url = f"https://lichess.org/game/export/{game_id}?moves=0&tags=0&clocks=0&evals=0&opening=0&literate=0&fen=1"
+    r = requests.get(url, headers=H_HUMAN, timeout=30)
+    if r.status_code != 200:
+        print(f"⚠️ Impossible de récupérer la FEN initiale : {r.status_code}")
+        return chess.STARTING_FEN
+    try:
+        data = r.json()
+        return data.get("fen", chess.STARTING_FEN)
+    except Exception:
+        return chess.STARTING_FEN
+
 if __name__ == "__main__":
     # (Optionnel) info bot
     try:
@@ -72,15 +86,22 @@ if __name__ == "__main__":
 
     # 💾 Sauvegardes locales initiales
     GAME_ID_FILE.write_text(cid, encoding="utf-8")
-    # FEN de départ (position initiale)
-    POSITION_FILE.write_text(chess.STARTING_FEN, encoding="utf-8")
-    # Dernier coup : rien encore, mais on pose un horodatage "maintenant"
+
+    # Récupération FEN réelle
+    fen_initiale = recuperer_fen_initiale(cid)
+    POSITION_FILE.write_text(fen_initiale, encoding="utf-8")
+
+    # Réinitialisation coup_blanc.txt
+    COUP_BLANCS_FILE.write_text("", encoding="utf-8")
+
+    # Dernier coup : rien encore, mais horodatage "maintenant"
     now_iso = datetime.now(timezone.utc).isoformat()
     LAST_MOVE_FILE.write_text(
-        json.dumps({"dernier_coup": None, "horodatage": now_iso}, ensure_ascii=False, indent=2),
+        json.dumps({"dernier_coup": None, "fen": fen_initiale, "horodatage": now_iso}, ensure_ascii=False, indent=2),
         encoding="utf-8"
     )
 
     print(f"ID sauvegardé dans {GAME_ID_FILE}")
     print(f"FEN initiale sauvegardée dans {POSITION_FILE}")
-    print(f"Fichier dernier_coup.json initialisé dans {LAST_MOVE_FILE}")
+    print(f"coup_blanc.txt vidé")
+    print(f"dernier_coup.json initialisé avec date et FEN")
