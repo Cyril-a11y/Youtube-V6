@@ -13,14 +13,24 @@ MOVE_HISTORY_FILE = Path("data/move_history.json")
 
 
 def load_game_id():
+    """Charge le Game ID depuis le fichier, avec affichage du chemin et date modification."""
     try:
-        return Path(GAME_ID_FILE).read_text(encoding="utf-8").strip()
-    except FileNotFoundError:
-        print("❌ game_id.txt introuvable. Lance 01_create_game.py d'abord.")
+        path = Path(GAME_ID_FILE).resolve()
+        if not path.exists():
+            print(f"❌ {path} introuvable. Lance 01_create_game.py d'abord.")
+            return None
+        mtime = datetime.fromtimestamp(path.stat().st_mtime, tz=timezone.utc)
+        print(f"📂 Lecture de {path} (modifié le {mtime.isoformat()})")
+        gid = path.read_text(encoding="utf-8").strip()
+        print(f"✅ Game ID chargé : {gid}")
+        return gid
+    except Exception as e:
+        print(f"❌ Impossible de lire le Game ID : {e}")
         return None
 
 
 def load_white_move():
+    """Lit le coup blanc proposé par la communauté."""
     if not COUP_BLANCS_FILE.exists():
         print("❌ coup_blanc.txt introuvable. Lance 03_process_comments.py d'abord.")
         return None
@@ -54,14 +64,11 @@ def fetch_current_state(game_id):
         print(f"❌ Réponse non-JSON : {e}")
         return None, None
 
-    # Cas simple : Lichess fournit déjà la FEN
     if data.get("fen"):
         fen = data["fen"]
         moves = data.get("moves", "").split()
-        last_move = moves[-1] if moves else None
-        return fen, last_move
+        return fen, (moves[-1] if moves else None)
 
-    # Sinon, on reconstruit à partir du PGN
     pgn_str = data.get("pgn")
     if not pgn_str:
         print("❌ Aucun PGN dans la réponse")
@@ -82,10 +89,7 @@ def fetch_current_state(game_id):
 
 
 def save_position_before_move(fen):
-    payload = {
-        "fen": fen,
-        "horodatage": datetime.now(timezone.utc).isoformat()
-    }
+    payload = {"fen": fen, "horodatage": datetime.now(timezone.utc).isoformat()}
     POSITION_BEFORE_FILE.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"📂 Position avant coup sauvegardée dans {POSITION_BEFORE_FILE}")
 
@@ -98,19 +102,18 @@ def update_position_files(fen, last_move):
         "horodatage": datetime.now(timezone.utc).isoformat(),
     }
     Path(LAST_MOVE_FILE).write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
-    print("✅ Position et dernier coup sauvegardés.")
+    print("✅ position.fen et dernier_coup.json mis à jour")
 
 
 def append_move_to_history(couleur: str, coup: str, fen: str):
+    history = []
     if MOVE_HISTORY_FILE.exists():
         try:
             history = json.loads(MOVE_HISTORY_FILE.read_text(encoding="utf-8"))
             if not isinstance(history, list):
                 history = []
         except Exception:
-            history = []
-    else:
-        history = []
+            pass
 
     history.append({
         "couleur": couleur,
@@ -126,11 +129,9 @@ def append_move_to_history(couleur: str, coup: str, fen: str):
 def to_uci(board: chess.Board, move_str: str):
     move_str = move_str.strip()
 
-    # Tolère "A4" → "a4"
     if len(move_str) == 2 and move_str[0].isalpha() and move_str[1].isdigit():
         move_str = move_str[0].lower() + move_str[1]
 
-    # 1) Essai SAN
     try:
         mv = board.parse_san(move_str)
         if mv in board.legal_moves:
@@ -138,7 +139,6 @@ def to_uci(board: chess.Board, move_str: str):
     except Exception:
         pass
 
-    # 2) Essai UCI
     try:
         mv = chess.Move.from_uci(move_str.lower())
         if mv in board.legal_moves:
@@ -146,7 +146,6 @@ def to_uci(board: chess.Board, move_str: str):
     except Exception:
         pass
 
-    # 3) Essai par case seule
     if len(move_str) == 2 and move_str[0] in "abcdefgh" and move_str[1] in "12345678":
         try:
             to_sq = chess.parse_square(move_str.lower())
@@ -173,7 +172,6 @@ if __name__ == "__main__":
     if not game_id:
         raise SystemExit(1)
 
-    # 1️⃣ Récupération position actuelle
     fen, last_move = fetch_current_state(game_id)
     if not fen:
         raise SystemExit(1)
@@ -182,13 +180,10 @@ if __name__ == "__main__":
     save_position_before_move(fen)
 
     board = chess.Board(fen)
-
-    # 1b) Vérifier que c'est bien aux Blancs
     if board.turn != chess.WHITE:
         print("⏳ Ce n'est pas aux Blancs de jouer. Arrêt.")
         raise SystemExit(0)
 
-    # 2️⃣ Charger le coup blanc
     move_str = load_white_move()
     print(f"🔍 Coup brut lu depuis coup_blanc.txt : {repr(move_str)}")
     if not move_str:
@@ -204,15 +199,13 @@ if __name__ == "__main__":
     san_str = board.san(chess.Move.from_uci(move_uci))
     print(f"♟️ Coup à jouer : SAN='{san_str}' | UCI='{move_uci}'")
 
-    # 3️⃣ Envoi à Lichess
     if not play_move(game_id, move_uci):
         print("❌ Lichess a refusé le coup.")
         raise SystemExit(1)
 
     print(f"✅ Coup joué avec succès : {move_uci} ({san_str})")
 
-    # 4️⃣ Sauvegarde après coup
-    fen, last_move = fetch_current_state(game_id)
-    if fen:
-        update_position_files(fen, last_move)
-        append_move_to_history("blanc", last_move, fen)
+    fen_after, last_move_after = fetch_current_state(game_id)
+    if fen_after:
+        update_position_files(fen_after, last_move_after)
+        append_move_to_history("blanc", last_move_after, fen_after)
