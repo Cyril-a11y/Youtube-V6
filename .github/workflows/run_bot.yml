@@ -1,4 +1,4 @@
-name: Run Lichess Bot (Debug)
+name: Run Lichess Bot (Debug + Vérification Nom)
 
 on:
   workflow_dispatch:
@@ -40,7 +40,7 @@ jobs:
       - name: Install engine + deps (one-time per job)
         run: |
           sudo apt-get update
-          sudo apt-get install -y stockfish
+          sudo apt-get install -y stockfish jq
           python -m pip install --upgrade pip
           pip install -r lichess-bot/requirements.txt
           which stockfish
@@ -50,6 +50,20 @@ jobs:
         run: |
           echo "LICHESS_BOT_TOKEN=$(printf '%s' '${{ secrets.LICHESS_BOT_TOKEN }}' | tr -d '\r\n')" >> $GITHUB_ENV
           echo "LICHESS_BOT_USERNAME=$(printf '%s' '${{ secrets.LICHESS_BOT_USERNAME }}' | tr -d '\r\n')" >> $GITHUB_ENV
+
+      # 🔍 Vérifie le vrai username du compte lié au token
+      - name: Vérification du nom du bot
+        run: |
+          echo "Vérification du nom du bot via l'API Lichess..."
+          BOT_NAME=$(curl -s -H "Authorization: Bearer $LICHESS_BOT_TOKEN" https://lichess.org/api/account | jq -r '.username')
+          echo "🔎 Nom renvoyé par Lichess: '$BOT_NAME'"
+          if [ "$BOT_NAME" != "PriseEnPassantBot" ]; then
+            echo "❌ ERREUR : Le token n'appartient pas au compte attendu."
+            echo "ℹ️  Nom trouvé: '$BOT_NAME'"
+            echo "💡 Vérifie que tu utilises le token API du bon compte bot."
+            exit 1
+          fi
+          echo "✅ Nom correct : $BOT_NAME"
 
       - name: Write debug config.yml
         run: |
@@ -70,7 +84,7 @@ jobs:
             rated: false
             variants: [standard]
             time_controls: [unlimited, correspondence]
-            log_moves: true    # ✅ Log des coups joués
+            log_moves: true
 
           challenge:
             allow_bot: false
@@ -82,7 +96,7 @@ jobs:
           echo "== config.yml head =="
           head -n 40 lichess-bot/config.yml | sed 's/token:.*/token: ****/'
 
-      # 🚀 Lance le bot en mode debug + affiche tous les événements
+      # 🚀 Lancement en mode debug
       - name: Run lichess-bot in verbose debug mode
         working-directory: lichess-bot
         env:
