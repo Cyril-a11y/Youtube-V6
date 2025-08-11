@@ -1,4 +1,4 @@
-name: Run Lichess Bot (Debug + Vérification Nom)
+name: Run Lichess Bot (Debug)
 
 on:
   workflow_dispatch:
@@ -51,9 +51,9 @@ jobs:
           echo "LICHESS_BOT_TOKEN=$(printf '%s' '${{ secrets.LICHESS_BOT_TOKEN }}' | tr -d '\r\n')" >> $GITHUB_ENV
           echo "LICHESS_BOT_USERNAME=$(printf '%s' '${{ secrets.LICHESS_BOT_USERNAME }}' | tr -d '\r\n')" >> $GITHUB_ENV
 
-      # 🔍 Vérifie le vrai username du compte lié au token
       - name: Vérification du nom du bot
         run: |
+          set -e
           echo "Vérification du nom du bot via l'API Lichess..."
           BOT_NAME=$(curl -s -H "Authorization: Bearer $LICHESS_BOT_TOKEN" https://lichess.org/api/account | jq -r '.username')
           echo "🔎 Nom renvoyé par Lichess: '$BOT_NAME'"
@@ -84,7 +84,7 @@ jobs:
             rated: false
             variants: [standard]
             time_controls: [unlimited, correspondence]
-            log_moves: true
+            log_moves: true    # ✅ Log des coups joués
 
           challenge:
             allow_bot: false
@@ -96,7 +96,6 @@ jobs:
           echo "== config.yml head =="
           head -n 40 lichess-bot/config.yml | sed 's/token:.*/token: ****/'
 
-      # 🚀 Lancement en mode debug
       - name: Run lichess-bot in verbose debug mode
         working-directory: lichess-bot
         env:
