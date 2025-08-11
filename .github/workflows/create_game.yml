@@ -53,7 +53,7 @@ jobs:
         run: |
           echo "" > data/coup_blanc.txt
           echo "" > data/position.fen
-          echo '{"dernier_coup": null, "fen": null, "horodatage": null}' > data/dernier_coup.json
+          echo "{\"dernier_coup\": null, \"fen\": null, \"horodatage\": \"$(date -u +'%Y-%m-%dT%H:%M:%SZ')\"}" > data/dernier_coup.json
 
       - name: Debug data dir
         run: |
