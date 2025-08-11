@@ -1,10 +1,10 @@
 name: Process Comments for White Move
 
 on:
-  workflow_dispatch:  # Lancement manuel
+  workflow_dispatch:
 
 permissions:
-  contents: write  # Autorisation d'écrire sur le dépôt
+  contents: write
 
 jobs:
   process_comments_white:
@@ -30,10 +30,14 @@ jobs:
         run: |
           python 03_process_comments.py
 
-      - name: Commit and push selected white move
+      - name: Play white move
+        run: |
+          python 04_play_white.py
+
+      - name: Commit and push changes
         run: |
           git config user.name "github-actions"
           git config user.email "actions@github.com"
           git add data/coup_blanc.txt
-          git commit -m "♟️ Coup blanc sélectionné" || echo "Rien à committer"
+          git commit -m "♟️ Coup blanc joué" || echo "Rien à committer"
           git push
