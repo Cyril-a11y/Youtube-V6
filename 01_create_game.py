@@ -1,6 +1,5 @@
 # 01_create_game.py
 import os
-import time
 import json
 import requests
 import chess
@@ -40,15 +39,13 @@ def creer_defi_illimite():
         "rated": "false",
         "color": COLOR,
         "variant": "standard",
-        "days": 14  # Mode correspondance
+        "days": 14  # Mode correspondance (jusqu'à 14 jours par coup)
     }
     r = requests.post(url, headers=H_HUMAN, data=data, timeout=30)
     if r.status_code != 200:
         raise SystemExit(f"Création défi KO: {r.status_code} {r.text}")
     js = r.json()
-    if "challenge" in js and "id" in js["challenge"]:
-        return js["challenge"]["id"]
-    return js.get("id")
+    return js.get("challenge", {}).get("id", js.get("id"))
 
 def accepter_defi_bot(challenge_id):
     url = f"https://lichess.org/api/challenge/{challenge_id}/accept"
@@ -56,30 +53,6 @@ def accepter_defi_bot(challenge_id):
     if r.status_code != 200:
         raise SystemExit(f"Acceptation KO: {r.status_code} {r.text}")
     print("Bot a accepté le défi.")
-
-def recuperer_fen_initiale(game_id, timeout=15, delay=2):
-    """
-    Attend que la partie soit démarrée et récupère la FEN initiale.
-    Timeout total = timeout secondes.
-    """
-    url = f"https://lichess.org/game/export/{game_id}?moves=0&fen=1"
-    t0 = time.time()
-    while time.time() - t0 < timeout:
-        r = requests.get(url, headers=H_HUMAN, timeout=30)
-        if r.status_code == 200:
-            try:
-                data = r.json()
-                fen = data.get("fen")
-                if fen and fen.strip():
-                    print(f"✅ FEN récupérée : {fen}")
-                    return fen
-            except Exception as e:
-                print(f"⚠️ Erreur parsing JSON : {e}")
-        print("⏳ FEN non encore dispo, nouvelle tentative…")
-        time.sleep(delay)
-
-    print("⚠️ FEN introuvable après attente, utilisation position standard.")
-    return chess.STARTING_FEN
 
 if __name__ == "__main__":
     # (Optionnel) info bot
@@ -98,17 +71,17 @@ if __name__ == "__main__":
     # 💾 Sauvegardes locales initiales
     GAME_ID_FILE.write_text(cid, encoding="utf-8")
 
-    # Récupération FEN réelle ou fallback
-    fen_initiale = recuperer_fen_initiale(cid)
-    POSITION_FILE.write_text(fen_initiale, encoding="utf-8")
+    # Position initiale directe
+    starting_fen = chess.STARTING_FEN
+    POSITION_FILE.write_text(starting_fen, encoding="utf-8")
 
-    # Réinitialisation coup_blanc.txt
+    # coup_blanc.txt vidé
     COUP_BLANCS_FILE.write_text("", encoding="utf-8")
 
-    # Dernier coup : rien encore, mais horodatage "maintenant"
+    # dernier_coup.json avec date et position initiale
     now_iso = datetime.now(timezone.utc).isoformat()
     LAST_MOVE_FILE.write_text(
-        json.dumps({"dernier_coup": None, "fen": fen_initiale, "horodatage": now_iso}, ensure_ascii=False, indent=2),
+        json.dumps({"dernier_coup": None, "fen": starting_fen, "horodatage": now_iso}, ensure_ascii=False, indent=2),
         encoding="utf-8"
     )
 
