@@ -49,6 +49,12 @@ jobs:
           LICHESS_BOT_USERNAME: ${{ env.LICHESS_BOT_USERNAME }}
         run: python 01_create_game.py
 
+      - name: Reset game data files
+        run: |
+          echo "" > data/coup_blanc.txt
+          echo "" > data/position.fen
+          echo '{"dernier_coup": null, "fen": null, "horodatage": null}' > data/dernier_coup.json
+
       - name: Debug data dir
         run: |
           ls -la
@@ -63,6 +69,6 @@ jobs:
           git config user.email "${{ github.actor }}@users.noreply.github.com"
           git fetch origin "$BRANCH"
           git pull --rebase origin "$BRANCH" || true
-          git add -f data/game_id.txt data/position.fen data/dernier_coup.json || true
+          git add -f data/game_id.txt data/position.fen data/dernier_coup.json data/coup_blanc.txt || true
           git commit -m "Init game data" || echo "No changes"
           git push origin HEAD:"$BRANCH"
