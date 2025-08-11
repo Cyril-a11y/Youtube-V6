@@ -1,4 +1,4 @@
-name: Process Comments for White Move
+name: Main
 
 on:
   workflow_dispatch:
