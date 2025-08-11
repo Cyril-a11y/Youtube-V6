@@ -3,6 +3,7 @@ import json
 import re
 import unicodedata
 import chess
+import sys
 from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
@@ -64,7 +65,11 @@ def recuperer_commentaires(video_id, max_results=100, apres=None):
     }
     nb = 0
     while True:
-        r = requests.get(url, params=params, timeout=30)
+        try:
+            r = requests.get(url, params=params, timeout=30)
+        except Exception as e:
+            print(f"❌ Erreur réseau API YouTube : {e}")
+            break
         if r.status_code != 200:
             print(f"❌ Erreur API YouTube : {r.status_code} {r.text}")
             break
@@ -98,7 +103,6 @@ def nettoyer_et_corriger_san(commentaire: str) -> str:
                .replace("–", "-").replace("—", "-")
                .replace("0-0-0", "O-O-O").replace("o-o-o", "O-O-O")
                .replace("0-0", "O-O").replace("o-o", "O-O"))
-
     txt = _sans_accents(raw.lower())
 
     if re.search(r"\b(grand\s*roque|roque\s*long|roque\s*cote\s*dame|roque\s*dame|rochade\s*longue)\b", txt):
@@ -175,10 +179,10 @@ def choisir_coup_majoritaire(coups_uci):
     print(f"🏆 Coup majoritaire: {coup} ({nb} votes)")
     return coup
 
-def sauvegarder_coup_blanc(coup_uci: str):
+def sauvegarder_coup_blanc(coup_uci: str | None):
     COUP_BLANCS_FILE.parent.mkdir(parents=True, exist_ok=True)
     COUP_BLANCS_FILE.write_text(coup_uci or "", encoding="utf-8")
-    print(f"💾 coup_blanc.txt mis à jour: '{coup_uci}'")
+    print(f"💾 coup_blanc.txt mis à jour: '{coup_uci or ''}'")
 
 # -----------------------
 # Lichess
@@ -190,9 +194,14 @@ def fetch_current_fen_from_lichess(game_id):
         "Authorization": f"Bearer {LICHESS_HUMAN_TOKEN}",
         "Accept": "application/json"
     }
-    r = requests.get(url, headers=headers, timeout=30)
+    try:
+        r = requests.get(url, headers=headers, timeout=30)
+    except Exception as e:
+        print(f"❌ Erreur réseau Lichess : {e}")
+        return None
     if r.status_code != 200:
-        raise RuntimeError(f"Erreur API Lichess : {r.status_code} {r.text}")
+        print(f"❌ Erreur API Lichess : {r.status_code} {r.text}")
+        return None
     data = r.json()
     return data.get("fen")
 
@@ -201,29 +210,38 @@ def fetch_current_fen_from_lichess(game_id):
 # -----------------------
 
 if __name__ == "__main__":
-    print("=== DÉBUT DU SCRIPT ===")
-    dernier_coup_time = charger_horodatage_dernier_coup()
-    commentaires = recuperer_commentaires(YOUTUBE_VIDEO_ID, apres=dernier_coup_time)
+    try:
+        print("=== DÉBUT DU SCRIPT ===")
+        dernier_coup_time = charger_horodatage_dernier_coup()
+        commentaires = recuperer_commentaires(YOUTUBE_VIDEO_ID, apres=dernier_coup_time)
 
-    if not commentaires:
-        print("⛔ Aucun commentaire récupéré")
-        sauvegarder_coup_blanc("")
-        exit(0)  # pas d'erreur
+        if not commentaires:
+            print("⛔ Aucun commentaire récupéré")
+            sauvegarder_coup_blanc("")
+            sys.exit(0)  # pas d'erreur
 
-    game_id = load_game_id()
-    if not game_id:
-        sauvegarder_coup_blanc("")
-        exit(0)
+        game_id = load_game_id()
+        if not game_id:
+            sauvegarder_coup_blanc("")
+            sys.exit(0)
 
-    fen = fetch_current_fen_from_lichess(game_id)
-    if not fen:
-        print("⛔ Impossible de récupérer la FEN")
-        sauvegarder_coup_blanc("")
-        exit(0)
+        fen = fetch_current_fen_from_lichess(game_id)
+        if not fen:
+            print("⛔ Impossible de récupérer la FEN")
+            sauvegarder_coup_blanc("")
+            sys.exit(0)
 
-    board = chess.Board(fen)
-    coups_valides_uci = extraire_coups_valides(board, commentaires)
-    coup_choisi_uci = choisir_coup_majoritaire(coups_valides_uci)
+        board = chess.Board(fen)
+        coups_valides_uci = extraire_coups_valides(board, commentaires)
+        coup_choisi_uci = choisir_coup_majoritaire(coups_valides_uci)
 
-    sauvegarder_coup_blanc(coup_choisi_uci)
-    print("=== FIN DU SCRIPT ===")
+        sauvegarder_coup_blanc(coup_choisi_uci)
+        print("=== FIN DU SCRIPT ===")
+        # sortie normale => code 0
+    except Exception as e:
+        print(f"⚠️ Erreur non bloquante: {e}")
+        try:
+            sauvegarder_coup_blanc("")
+        except Exception:
+            pass
+        sys.exit(0)
