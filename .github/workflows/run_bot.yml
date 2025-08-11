@@ -56,10 +56,12 @@ jobs:
           set -e
           echo "Vérification du nom du bot via l'API Lichess..."
           BOT_NAME=$(curl -s -H "Authorization: Bearer $LICHESS_BOT_TOKEN" https://lichess.org/api/account | jq -r '.username')
-          echo "🔎 Nom renvoyé par Lichess: '$BOT_NAME'"
+          echo "$BOT_NAME" > bot_name.txt
+          echo "🔎 Nom renvoyé par Lichess (stocké dans bot_name.txt)"
+          cat bot_name.txt
           if [ "$BOT_NAME" != "PriseEnPassantBot" ]; then
             echo "❌ ERREUR : Le token n'appartient pas au compte attendu."
-            echo "ℹ️  Nom trouvé: '$BOT_NAME'"
+            echo "ℹ️  Nom trouvé: $BOT_NAME"
             echo "💡 Vérifie que tu utilises le token API du bon compte bot."
             exit 1
           fi
@@ -84,7 +86,7 @@ jobs:
             rated: false
             variants: [standard]
             time_controls: [unlimited, correspondence]
-            log_moves: true    # ✅ Log des coups joués
+            log_moves: true
 
           challenge:
             allow_bot: false
