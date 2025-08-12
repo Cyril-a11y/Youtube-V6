@@ -86,4 +86,178 @@ def recuperer_commentaires(video_id, max_results=100, apres=None):
             log(f"Erreur réseau API YouTube : {e}", "err")
             break
         if r.status_code != 200:
-            log(f"Erreur
+            log(f"Erreur API YouTube : {r.status_code} {r.text[:200]}", "err")
+            break
+        data = r.json()
+        for item in data.get("items", []):
+            snippet = item["snippet"]["topLevelComment"]["snippet"]
+            texte = snippet["textDisplay"]
+            date_pub = datetime.fromisoformat(snippet["publishedAt"].replace("Z", "+00:00"))
+            if apres and date_pub <= apres:
+                continue
+            commentaires.append(texte)
+            nb += 1
+        log(f"Page récupérée, total commentaires valides : {nb}", "find")
+        if "nextPageToken" in data:
+            params["pageToken"] = data["nextPageToken"]
+        else:
+            break
+    log(f"{len(commentaires)} commentaire(s) récupéré(s) au total", "ok")
+    return commentaires
+
+def _sans_accents(s: str) -> str:
+    return "".join(c for c in unicodedata.normalize("NFD", s) if unicodedata.category(c) != "Mn")
+
+def nettoyer_et_corriger_san(commentaire: str) -> str:
+    raw = commentaire.strip()
+    raw = (raw.replace("×", "x").replace("–", "-").replace("—", "-")
+               .replace("0-0-0", "O-O-O").replace("o-o-o", "O-O-O")
+               .replace("0-0", "O-O").replace("o-o", "O-O"))
+    txt = _sans_accents(raw.lower())
+
+    if re.search(r"\b(grand\s*roque|roque\s*long|cote\s*dame|rochade\s*longue)\b", txt):
+        return "O-O-O"
+    if re.search(r"\b(petit\s*roque|roque\s*court|cote\s*roi|rochade\s*courte)\b", txt) or re.fullmatch(r"\s*roque\s*", txt):
+        return "O-O"
+
+    if re.fullmatch(r"[A-H][1-8]", raw):
+        raw = raw.lower()
+
+    cleaned = re.sub(r"[^a-hA-H1-8NBRQKCTFDRxXO\-+=#]", "", raw)
+    trad = {"C": "N", "F": "B", "T": "R", "D": "Q", "R": "K"}
+    if cleaned[:1] in trad:
+        cleaned = trad[cleaned[0]] + cleaned[1:]
+    if "x" in cleaned and cleaned[:1] in trad:
+        cleaned = trad[cleaned[0]] + cleaned[1:]
+    if re.fullmatch(r"[a-h][1-8][QRBNqrbn]", cleaned):
+        cleaned = f"{cleaned[:2]}={cleaned[2:]}"
+    return cleaned
+
+UCI_REGEX = re.compile(r"^[a-h][1-8][a-h][1-8][qrbn]?$")
+
+def _parse_move_any(board: chess.Board, token: str) -> chess.Move | None:
+    try:
+        return board.parse_san(token)
+    except Exception:
+        pass
+    tok = token.lower()
+    if UCI_REGEX.fullmatch(tok):
+        try:
+            m = chess.Move.from_uci(tok)
+            if m in board.legal_moves:
+                return m
+        except Exception:
+            pass
+    if re.fullmatch(r"[a-h][1-8]", tok):
+        to_sq = chess.parse_square(tok)
+        candidates = [m for m in board.legal_moves if m.to_square == to_sq]
+        if len(candidates) == 1:
+            return candidates[0]
+    return None
+
+def extraire_coups_valides(board: chess.Board, commentaires):
+    valides_uci = []
+    for com in commentaires:
+        token = nettoyer_et_corriger_san(com)
+        log(f"Commentaire brut: '{com}' → nettoyé: '{token}'", "info")
+        if not token:
+            log("Ignoré: vide après nettoyage", "warn")
+            continue
+        move = _parse_move_any(board, token)
+        if move and move in board.legal_moves:
+            san = board.san(move)
+            uci = move.uci()
+            valides_uci.append(uci)
+            log(f"Coup valide: SAN='{san}' | UCI='{uci}'", "ok")
+        else:
+            log(f"Coup illégal ou non reconnu: '{token}'", "err")
+    log(f"Liste finale coups valides (UCI): {valides_uci}", "find")
+    return valides_uci
+
+def choisir_coup_majoritaire(coups_uci):
+    if not coups_uci:
+        log("Aucun coup majoritaire possible (liste vide)", "err")
+        return None
+    coup, nb = Counter(coups_uci).most_common(1)[0]
+    log(f"Coup majoritaire: {coup} ({nb} vote(s))", "ok")
+    return coup
+
+def sauvegarder_coup_blanc(coup_uci: str | None):
+    COUP_BLANCS_FILE.parent.mkdir(parents=True, exist_ok=True)
+    if coup_uci:
+        COUP_BLANCS_FILE.write_text(coup_uci, encoding="utf-8")
+        log(f"coup_blanc.txt mis à jour: '{coup_uci}'", "save")
+    else:
+        log("Aucun coup à sauvegarder, fichier non modifié.", "warn")
+
+def fetch_current_fen_from_lichess(game_id):
+    url = f"https://lichess.org/game/export/{game_id}?moves=1&tags=1&pgnInJson=1&clocks=0"
+    headers = {"Authorization": f"Bearer {LICHESS_HUMAN_TOKEN}", "Accept": "application/json"}
+    try:
+        r = requests.get(url, headers=headers, timeout=30)
+    except Exception as e:
+        log(f"Erreur réseau Lichess : {e}", "err")
+        return None
+    if r.status_code != 200:
+        log(f"Erreur API Lichess : {r.status_code} {r.text[:200]}", "err")
+        return None
+    try:
+        data = r.json()
+    except Exception as e:
+        log(f"Réponse non-JSON : {e}", "err")
+        return None
+    if data.get("fen"):
+        fen = data["fen"]
+        log(f"FEN récupérée directement : {fen}", "ok")
+        return fen
+    pgn_str = data.get("pgn")
+    if not pgn_str:
+        log("Aucun PGN dans la réponse", "err")
+        return None
+    game = chess.pgn.read_game(io.StringIO(pgn_str))
+    if not game:
+        log("Impossible de parser le PGN", "err")
+        return None
+    board = game.board()
+    for move in game.mainline_moves():
+        board.push(move)
+    fen = board.fen()
+    log(f"FEN reconstruite depuis le PGN : {fen}", "ok")
+    return fen
+
+# -----------------------
+# Main
+# -----------------------
+if __name__ == "__main__":
+    try:
+        print("=== DÉBUT DU SCRIPT ===")
+        dernier_coup_time = charger_horodatage_dernier_coup()
+        commentaires = recuperer_commentaires(YOUTUBE_VIDEO_ID, apres=dernier_coup_time)
+
+        if not commentaires:
+            sauvegarder_coup_blanc(None)
+            sys.exit(0)
+
+        game_id = load_game_id()
+        if not game_id:
+            sauvegarder_coup_blanc(None)
+            sys.exit(0)
+
+        fen = fetch_current_fen_from_lichess(game_id)
+        if not fen:
+            sauvegarder_coup_blanc(None)
+            sys.exit(0)
+
+        board = chess.Board(fen)
+        coups_valides_uci = extraire_coups_valides(board, commentaires)
+        coup_choisi_uci = choisir_coup_majoritaire(coups_valides_uci)
+        sauvegarder_coup_blanc(coup_choisi_uci)
+
+        print("=== FIN DU SCRIPT ===")
+    except Exception as e:
+        log(f"Erreur non bloquante: {e}", "err")
+        try:
+            sauvegarder_coup_blanc(None)
+        except Exception:
+            pass
+        sys.exit(0)
