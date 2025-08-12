@@ -1,4 +1,4 @@
-name: Run Lichess Bot (Debug)
+name: Run Lichess Bot (One-Shot Black Move)
 
 on:
   workflow_dispatch:
@@ -18,7 +18,7 @@ concurrency:
 jobs:
   bot:
     runs-on: ubuntu-latest
-    timeout-minutes: 360
+    timeout-minutes: 15  # pas besoin de 6h pour un coup
 
     steps:
       - name: Checkout repository
@@ -51,7 +51,7 @@ jobs:
           which stockfish
           stockfish --version
 
-      - name: Load env (token/username from repo secrets if you use them later)
+      - name: Load env variables
         run: |
           echo "LICHESS_BOT_TOKEN=${{ secrets.LICHESS_BOT_TOKEN }}" >> $GITHUB_ENV
           echo "LICHESS_BOT_USERNAME=${{ secrets.LICHESS_BOT_USERNAME }}" >> $GITHUB_ENV
@@ -61,26 +61,12 @@ jobs:
         run: |
           set -e
           mkdir -p data
-          echo "Vérification du nom du bot via l'API Lichess..."
           BOT_NAME=$(curl -s -H "Authorization: Bearer $LICHESS_BOT_TOKEN" https://lichess.org/api/account | jq -r '.username')
           echo "$BOT_NAME" > data/bot_name.txt
-          echo "🔎 Nom renvoyé par Lichess: '$BOT_NAME'"
           if [ -n "$LICHESS_BOT_USERNAME" ] && [ "$BOT_NAME" != "$LICHESS_BOT_USERNAME" ]; then
             echo "❌ ERREUR : Le token ne correspond pas au compte attendu."
-            echo "ℹ️ Nom trouvé: '$BOT_NAME'"
             exit 1
           fi
-          echo "✅ Nom correct : $BOT_NAME"
-
-      - name: Commit bot_name.txt
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          git config user.name "github-actions"
-          git config user.email "actions@github.com"
-          git add data/bot_name.txt
-          git commit -m "Ajout du nom du bot détecté" || echo "Aucun changement"
-          git push
 
       - name: Write config.yml (accept all time controls + adjustable Elo)
         run: |
@@ -107,24 +93,16 @@ jobs:
 
           challenge:
             allow_bot: false
-            max_concurrent: 2
+            max_concurrent: 1
 
           abort_time: 20
           YML
 
-          echo "== config.yml (token masqué) =="
-          sed 's/token:.*/token: ****/' lichess-bot/config.yml | head -n 40
-          echo "Elo configuré: ${BOT_ELO}"
-
-      - name: Run lichess-bot in verbose debug mode
+      - name: Run lichess-bot once (stop after move)
         working-directory: lichess-bot
         env:
           LICHESS_BOT_TOKEN: ${{ env.LICHESS_BOT_TOKEN }}
         run: |
-          set -e
-          while true; do
-            echo "== Starting lichess-bot with DEBUG logging =="
-            python lichess-bot.py -vv --logfile /dev/stdout || true
-            echo "== Bot exited (code=$?). Restarting in 10s =="
-            sleep 10
-          done
+          echo "== Starting lichess-bot to play the black move =="
+          python lichess-bot.py -vv --logfile /dev/stdout
+          echo "== Bot finished running, workflow ending =="
