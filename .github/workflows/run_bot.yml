@@ -2,9 +2,14 @@ name: Run Lichess Bot (Debug)
 
 on:
   workflow_dispatch:
+    inputs:
+      elo:
+        description: "Elo simulé par Stockfish (1350–2850)"
+        required: false
+        default: "1500"
 
 permissions:
-  contents: write  # autorise commit/push avec GITHUB_TOKEN
+  contents: write
 
 concurrency:
   group: run-bot
@@ -46,10 +51,11 @@ jobs:
           which stockfish
           stockfish --version
 
-      - name: Load secrets into environment
+      - name: Load env (token/username from repo secrets if you use them later)
         run: |
           echo "LICHESS_BOT_TOKEN=${{ secrets.LICHESS_BOT_TOKEN }}" >> $GITHUB_ENV
           echo "LICHESS_BOT_USERNAME=${{ secrets.LICHESS_BOT_USERNAME }}" >> $GITHUB_ENV
+          echo "BOT_ELO=${{ github.event.inputs.elo }}" >> $GITHUB_ENV
 
       - name: Vérification du nom du bot
         run: |
@@ -59,7 +65,7 @@ jobs:
           BOT_NAME=$(curl -s -H "Authorization: Bearer $LICHESS_BOT_TOKEN" https://lichess.org/api/account | jq -r '.username')
           echo "$BOT_NAME" > data/bot_name.txt
           echo "🔎 Nom renvoyé par Lichess: '$BOT_NAME'"
-          if [ "$BOT_NAME" != "$LICHESS_BOT_USERNAME" ]; then
+          if [ -n "$LICHESS_BOT_USERNAME" ] && [ "$BOT_NAME" != "$LICHESS_BOT_USERNAME" ]; then
             echo "❌ ERREUR : Le token ne correspond pas au compte attendu."
             echo "ℹ️ Nom trouvé: '$BOT_NAME'"
             exit 1
@@ -76,10 +82,10 @@ jobs:
           git commit -m "Ajout du nom du bot détecté" || echo "Aucun changement"
           git push
 
-      - name: Write config.yml (safe output)
+      - name: Write config.yml (accept all time controls + adjustable Elo)
         run: |
           mkdir -p lichess-bot
-          cat > lichess-bot/config.yml <<'YML'
+          cat > lichess-bot/config.yml <<YML
           token: "${LICHESS_BOT_TOKEN}"
 
           engine:
@@ -90,11 +96,13 @@ jobs:
             uci_options:
               Threads: 2
               Hash: 128
+              UCI_LimitStrength: true
+              UCI_Elo: ${BOT_ELO}
 
           play:
             rated: false
             variants: [standard]
-            time_controls: [unlimited, correspondence]
+            time_controls: any
             log_moves: true
 
           challenge:
@@ -104,14 +112,14 @@ jobs:
           abort_time: 20
           YML
 
-          echo "== config.yml head =="
+          echo "== config.yml (token masqué) =="
           sed 's/token:.*/token: ****/' lichess-bot/config.yml | head -n 40
+          echo "Elo configuré: ${BOT_ELO}"
 
       - name: Run lichess-bot in verbose debug mode
         working-directory: lichess-bot
         env:
           LICHESS_BOT_TOKEN: ${{ env.LICHESS_BOT_TOKEN }}
-          LICHESS_BOT_USERNAME: ${{ env.LICHESS_BOT_USERNAME }}
         run: |
           set -e
           while true; do
