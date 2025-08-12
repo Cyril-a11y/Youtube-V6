@@ -5,9 +5,6 @@ from datetime import datetime, timezone
 from pathlib import Path
 import chess
 
-# -----------------------
-# Config & chemins
-# -----------------------
 LICHESS_BOT_TOKEN = os.getenv("LICHESS_BOT_TOKEN")
 GAME_ID_FILE = Path("data/game_id.txt")
 LAST_MOVE_FILE = Path("data/dernier_coup.json")
@@ -27,39 +24,51 @@ def load_game_id():
     return gid
 
 def fetch_current_fen(game_id):
-    """Récupère le FEN actuel depuis Lichess"""
     url = f"https://lichess.org/game/export/{game_id}"
     params = {"fen": "1"}
     headers = {"Authorization": f"Bearer {LICHESS_BOT_TOKEN}", "Accept": "application/json"}
 
-    r = requests.get(url, params=params, headers=headers, timeout=15)
-    if r.status_code != 200:
-        log(f"Erreur API Lichess: {r.status_code} {r.text}", "err")
+    log(f"📤 Appel API pour récupérer FEN: {url}", "info")
+    try:
+        r = requests.get(url, params=params, headers=headers, timeout=15)
+    except Exception as e:
+        log(f"Erreur de connexion API: {e}", "err")
         return None
-    data = r.json()
-    return data.get("fen")
+
+    log(f"📥 Réponse API: HTTP {r.status_code}", "info")
+    if r.status_code != 200:
+        log(f"Réponse erreur: {r.text}", "err")
+        return None
+
+    try:
+        data = r.json()
+    except Exception as e:
+        log(f"Erreur parsing JSON: {e}", "err")
+        return None
+
+    fen = data.get("fen")
+    log(f"FEN récupéré: {fen}", "info")
+    return fen
 
 def is_black_to_move(fen):
     return fen and fen.split()[1] == "b"
 
 def play_black_move(game_id, fen):
-    """Joue un coup noir avec l’API bot:play"""
     board = chess.Board(fen)
     move = list(board.legal_moves)[0].uci()  # Premier coup légal
     url = f"https://lichess.org/api/bot/game/{game_id}/move/{move}"
     headers = {"Authorization": f"Bearer {LICHESS_BOT_TOKEN}"}
+    log(f"📤 Tentative de jouer le coup noir: {move}", "info")
     r = requests.post(url, headers=headers)
+    log(f"📥 Réponse API move: HTTP {r.status_code}", "info")
     if r.status_code != 200:
-        log(f"Erreur en jouant: {r.status_code} {r.text}", "err")
+        log(f"Erreur en jouant: {r.text}", "err")
         return None
     log(f"Coup noir joué: {move}", "send")
     return move
 
 def update_data_files(fen, move):
-    # position.fen
     FEN_FILE.write_text(fen or "", encoding="utf-8")
-
-    # dernier_coup.json
     payload = {
         "dernier_coup": move,
         "fen": fen,
@@ -67,7 +76,6 @@ def update_data_files(fen, move):
     }
     LAST_MOVE_FILE.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
 
-    # move_history.json
     history = []
     if MOVE_HISTORY_FILE.exists():
         try:
@@ -86,9 +94,6 @@ def update_data_files(fen, move):
 
     log("Fichiers data mis à jour", "save")
 
-# -----------------------
-# Main
-# -----------------------
 if __name__ == "__main__":
     game_id = load_game_id()
     if not game_id:
@@ -98,8 +103,6 @@ if __name__ == "__main__":
     if not fen:
         raise SystemExit(1)
 
-    log(f"FEN actuel: {fen}", "info")
-
     if not is_black_to_move(fen):
         log("Ce n'est pas aux Noirs de jouer, arrêt.", "info")
         raise SystemExit(0)
@@ -107,5 +110,6 @@ if __name__ == "__main__":
     move_played = play_black_move(game_id, fen)
     if move_played:
         new_fen = fetch_current_fen(game_id)
-        update_data_files(new_fen, move_played)
-        log("Coup noir joué et fichiers mis à jour.", "ok")
+        if new_fen:
+            update_data_files(new_fen, move_played)
+            log("Coup noir joué et fichiers mis à jour.", "ok")
