@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write   # ⬅ nécessaire pour commit/push
+  contents: write  # pour commit/push
 
 concurrency:
   group: run-bot
@@ -16,7 +16,7 @@ jobs:
     timeout-minutes: 360
 
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
@@ -27,9 +27,9 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: "3.11"
 
-      - name: Cache pip (lichess-bot)
+      - name: Cache pip dependencies
         uses: actions/cache@v4
         with:
           path: ~/.cache/pip
@@ -37,7 +37,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pip-lichess-bot-
 
-      - name: Install engine + deps
+      - name: Install Stockfish and dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y stockfish jq
@@ -46,10 +46,10 @@ jobs:
           which stockfish
           stockfish --version
 
-      - name: Sanitize secrets
+      - name: Load secrets into environment
         run: |
-          echo "LICHESS_BOT_TOKEN=$(printf '%s' '${{ secrets.LICHESS_BOT_TOKEN }}' | tr -d '\r\n')" >> $GITHUB_ENV
-          echo "LICHESS_BOT_USERNAME=$(printf '%s' '${{ secrets.LICHESS_BOT_USERNAME }}' | tr -d '\r\n')" >> $GITHUB_ENV
+          echo "LICHESS_BOT_TOKEN=${{ secrets.LICHESS_BOT_TOKEN }}" >> $GITHUB_ENV
+          echo "LICHESS_BOT_USERNAME=${{ secrets.LICHESS_BOT_USERNAME }}" >> $GITHUB_ENV
 
       - name: Vérification du nom du bot
         run: |
@@ -59,10 +59,9 @@ jobs:
           BOT_NAME=$(curl -s -H "Authorization: Bearer $LICHESS_BOT_TOKEN" https://lichess.org/api/account | jq -r '.username')
           echo "$BOT_NAME" > data/bot_name.txt
           echo "🔎 Nom renvoyé par Lichess: '$BOT_NAME'"
-          if [ "$BOT_NAME" != "PriseEnPassantBot" ]; then
-            echo "❌ ERREUR : Le token n'appartient pas au compte attendu."
-            echo "ℹ️  Nom trouvé: '$BOT_NAME'"
-            echo "💡 Vérifie que tu utilises le token API du bon compte bot."
+          if [ "$BOT_NAME" != "$LICHESS_BOT_USERNAME" ]; then
+            echo "❌ ERREUR : Le token ne correspond pas au compte attendu."
+            echo "ℹ️ Nom trouvé: '$BOT_NAME'"
             exit 1
           fi
           echo "✅ Nom correct : $BOT_NAME"
@@ -73,9 +72,9 @@ jobs:
           git config user.email "actions@github.com"
           git add data/bot_name.txt
           git commit -m "Ajout du nom du bot détecté" || echo "Aucun changement"
-          git push
+          git push --force-with-lease
 
-      - name: Write debug config.yml
+      - name: Write config.yml (safe output)
         run: |
           mkdir -p lichess-bot
           cat > lichess-bot/config.yml <<'YML'
@@ -94,7 +93,7 @@ jobs:
             rated: false
             variants: [standard]
             time_controls: [unlimited, correspondence]
-            log_moves: true    # ✅ Log des coups joués
+            log_moves: true
 
           challenge:
             allow_bot: false
@@ -104,7 +103,7 @@ jobs:
           YML
 
           echo "== config.yml head =="
-          head -n 40 lichess-bot/config.yml | sed 's/token:.*/token: ****/'
+          sed 's/token:.*/token: ****/' lichess-bot/config.yml | head -n 40
 
       - name: Run lichess-bot in verbose debug mode
         working-directory: lichess-bot
