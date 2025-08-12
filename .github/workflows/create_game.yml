@@ -36,27 +36,23 @@ jobs:
       - name: Ensure data folder exists
         run: mkdir -p data
 
-      - name: Sanitize tokens
+      - name: Load secrets into environment
         run: |
-          echo "LICHESS_HUMAN_TOKEN=$(printf '%s' '${{ secrets.LICHESS_HUMAN_TOKEN }}' | tr -d '\r\n')" >> $GITHUB_ENV
-          echo "LICHESS_BOT_TOKEN=$(printf '%s' '${{ secrets.LICHESS_BOT_TOKEN }}' | tr -d '\r\n')" >> $GITHUB_ENV
-          echo "LICHESS_BOT_USERNAME=$(printf '%s' '${{ secrets.LICHESS_BOT_USERNAME }}' | tr -d '\r\n')" >> $GITHUB_ENV
+          echo "LICHESS_HUMAN_TOKEN=${{ secrets.LICHESS_HUMAN_TOKEN }}" >> $GITHUB_ENV
+          echo "LICHESS_BOT_TOKEN=${{ secrets.LICHESS_BOT_TOKEN }}" >> $GITHUB_ENV
+          echo "LICHESS_BOT_USERNAME=${{ secrets.LICHESS_BOT_USERNAME }}" >> $GITHUB_ENV
 
-      - name: Create game
-        env:
-          LICHESS_HUMAN_TOKEN: ${{ env.LICHESS_HUMAN_TOKEN }}
-          LICHESS_BOT_TOKEN: ${{ env.LICHESS_BOT_TOKEN }}
-          LICHESS_BOT_USERNAME: ${{ env.LICHESS_BOT_USERNAME }}
+      - name: Create game on Lichess
         run: python 01_create_game.py
 
-      - name: Reset game data files with starting position
+      - name: Reset game data (only if creation succeeded)
+        if: success()
         run: |
           python - <<'PY'
           import json
           from datetime import datetime, timezone
           import chess
 
-          # Position initiale
           starting_fen = chess.STARTING_FEN
 
           # coup_blanc.txt vide
@@ -76,15 +72,15 @@ jobs:
               json.dump(payload, f, ensure_ascii=False, indent=2)
           PY
 
-      - name: Debug data dir
+      - name: Debug data directory
         run: |
-          ls -la
           ls -la data || true
           echo "game_id:"; test -f data/game_id.txt && cat data/game_id.txt || echo "missing"
           echo "fen:"; test -f data/position.fen && head -n1 data/position.fen || echo "missing"
           echo "last:"; test -f data/dernier_coup.json && cat data/dernier_coup.json || echo "missing"
 
       - name: Commit & push game data
+        if: success()
         run: |
           git config user.name "${{ github.actor }}"
           git config user.email "${{ github.actor }}@users.noreply.github.com"
@@ -92,4 +88,4 @@ jobs:
           git pull --rebase origin "$BRANCH" || true
           git add -f data/game_id.txt data/position.fen data/dernier_coup.json data/coup_blanc.txt || true
           git commit -m "Init game data with starting FEN" || echo "No changes"
-          git push origin HEAD:"$BRANCH"
+          git push --force-with-lease origin HEAD:"$BRANCH"
