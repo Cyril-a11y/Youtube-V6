@@ -1,4 +1,4 @@
-# 05_play_black.py — version robuste avec reconstruction FEN depuis PGN + logs détaillés
+# 05_play_black.py — version robuste avec reconstruction FEN depuis PGN ou JSON + logs détaillés
 
 import os
 import json
@@ -33,48 +33,46 @@ def load_game_id():
     return gid
 
 def fetch_game_state(game_id):
-    """Retourne (fen, moves_str) en se basant sur la FEN ou en la reconstruisant via le PGN."""
+    """Retourne (fen, moves_str) depuis JSON si dispo, sinon reconstruit depuis le PGN brut."""
     url = f"https://lichess.org/game/export/{game_id}"
     params = {"fen": "1", "moves": "1", "pgn": "1"}
-    headers = {"Authorization": f"Bearer {LICHESS_BOT_TOKEN}", "Accept": "application/json"}
+    headers = {"Authorization": f"Bearer {LICHESS_BOT_TOKEN}"}
     log(f"📤 GET {url}?fen=1&moves=1&pgn=1")
+
     r = requests.get(url, params=params, headers=headers, timeout=20)
     log(f"📥 HTTP {r.status_code}")
     if r.status_code != 200:
         log(f"Réponse: {r.text[:300]}", "❌")
         return None, None
 
+    # Essayer JSON d'abord
     try:
         data = r.json()
+        fen = data.get("fen")
+        moves_str = data.get("moves") or ""
+        if fen:
+            log("✅ FEN reçue directement depuis JSON Lichess")
+            return fen, moves_str
+    except Exception:
+        pass  # Pas du JSON → on passe au PGN brut
+
+    # PGN brut → on reconstruit
+    pgn_text = r.text.strip()
+    try:
+        pgn_io = io.StringIO(pgn_text)
+        game = chess.pgn.read_game(pgn_io)
+        board = game.board()
+        for move in game.mainline_moves():
+            board.push(move)
+        fen = board.fen()
+        moves_str = " ".join(str(m) for m in game.mainline_moves())
+        log("🔄 FEN reconstruite depuis le PGN brut")
+        log(f"FEN: {fen}")
+        log(f"Moves: {moves_str}")
+        return fen, moves_str
     except Exception as e:
-        log(f"JSON invalide: {e}", "❌")
+        log(f"❌ Erreur de lecture PGN brut: {e}", "❌")
         return None, None
-
-    fen = data.get("fen")
-    moves_str = data.get("moves") or ""
-
-    if fen:
-        log("✅ FEN reçue directement depuis l'API Lichess")
-    else:
-        if "pgn" in data:
-            try:
-                pgn_io = io.StringIO(data["pgn"])
-                game = chess.pgn.read_game(pgn_io)
-                board = game.board()
-                for move in game.mainline_moves():
-                    board.push(move)
-                fen = board.fen()
-                log("🔄 FEN reconstruite depuis le PGN")
-            except Exception as e:
-                log(f"Impossible de reconstruire la FEN depuis le PGN: {e}", "❌")
-                return None, None
-        else:
-            log("❌ Pas de FEN ni de PGN dans la réponse API", "❌")
-            return None, None
-
-    log(f"FEN: {fen}")
-    log(f"Moves (taille): {len(moves_str.split())}")
-    return fen, moves_str
 
 def is_black_to_move(fen: str) -> bool:
     try:
