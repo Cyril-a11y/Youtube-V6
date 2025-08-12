@@ -1,4 +1,3 @@
-# 05_play_black.py
 import os
 import json
 import requests
@@ -122,6 +121,12 @@ if __name__ == "__main__":
     fen, last_uci, _ = fetch_current_state(game_id)
     if not fen:
         raise SystemExit(1)
+
+    # ✅ On vérifie AVANT toute sauvegarde si c'est aux noirs
+    if not is_black_to_move(fen):
+        log("Ce n'est pas aux Noirs de jouer, arrêt du script.", "info")
+        raise SystemExit(0)
+
     save_position_before_move(fen)
 
     log("Attente du coup noir...", "wait")
