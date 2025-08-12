@@ -3,12 +3,19 @@ import json
 import requests
 from datetime import datetime, timezone
 from pathlib import Path
-import chess
 
+# -----------------------
+# Config
+# -----------------------
+REPO = "Cyril-a11y/Youtube-V6"
+BOT_WORKFLOW_FILE = "run-bot.yml"
+
+GH_TOKEN = os.getenv("GH_PAT")  # Token GitHub avec permission workflow
 LICHESS_BOT_TOKEN = os.getenv("LICHESS_BOT_TOKEN")
+
 GAME_ID_FILE = Path("data/game_id.txt")
-LAST_MOVE_FILE = Path("data/dernier_coup.json")
 FEN_FILE = Path("data/position.fen")
+LAST_MOVE_FILE = Path("data/dernier_coup.json")
 MOVE_HISTORY_FILE = Path("data/move_history.json")
 
 def log(msg, type="info"):
@@ -27,45 +34,33 @@ def fetch_current_fen(game_id):
     url = f"https://lichess.org/game/export/{game_id}"
     params = {"fen": "1"}
     headers = {"Authorization": f"Bearer {LICHESS_BOT_TOKEN}", "Accept": "application/json"}
-
-    log(f"📤 Appel API pour récupérer FEN: {url}", "info")
     try:
         r = requests.get(url, params=params, headers=headers, timeout=15)
     except Exception as e:
-        log(f"Erreur de connexion API: {e}", "err")
+        log(f"Erreur API Lichess : {e}", "err")
         return None
-
-    log(f"📥 Réponse API: HTTP {r.status_code}", "info")
     if r.status_code != 200:
-        log(f"Réponse erreur: {r.text}", "err")
+        log(f"Erreur API {r.status_code}: {r.text}", "err")
         return None
-
-    try:
-        data = r.json()
-    except Exception as e:
-        log(f"Erreur parsing JSON: {e}", "err")
-        return None
-
-    fen = data.get("fen")
-    log(f"FEN récupéré: {fen}", "info")
-    return fen
+    data = r.json()
+    return data.get("fen"), data.get("lastMove", None)
 
 def is_black_to_move(fen):
     return fen and fen.split()[1] == "b"
 
-def play_black_move(game_id, fen):
-    board = chess.Board(fen)
-    move = list(board.legal_moves)[0].uci()  # Premier coup légal
-    url = f"https://lichess.org/api/bot/game/{game_id}/move/{move}"
-    headers = {"Authorization": f"Bearer {LICHESS_BOT_TOKEN}"}
-    log(f"📤 Tentative de jouer le coup noir: {move}", "info")
-    r = requests.post(url, headers=headers)
-    log(f"📥 Réponse API move: HTTP {r.status_code}", "info")
-    if r.status_code != 200:
-        log(f"Erreur en jouant: {r.text}", "err")
-        return None
-    log(f"Coup noir joué: {move}", "send")
-    return move
+def trigger_bot_workflow():
+    """Déclenche le workflow GitHub Actions du bot."""
+    url = f"https://api.github.com/repos/{REPO}/actions/workflows/{BOT_WORKFLOW_FILE}/dispatches"
+    headers = {
+        "Authorization": f"Bearer {GH_TOKEN}",
+        "Accept": "application/vnd.github+json"
+    }
+    payload = {"ref": "main"}
+    r = requests.post(url, headers=headers, json=payload)
+    if r.status_code == 204:
+        log("Workflow bot déclenché avec succès", "ok")
+    else:
+        log(f"Erreur déclenchement workflow bot: {r.status_code} {r.text}", "err")
 
 def update_data_files(fen, move):
     FEN_FILE.write_text(fen or "", encoding="utf-8")
@@ -91,7 +86,6 @@ def update_data_files(fen, move):
         "horodatage": datetime.now(timezone.utc).isoformat()
     })
     MOVE_HISTORY_FILE.write_text(json.dumps(history, ensure_ascii=False, indent=2), encoding="utf-8")
-
     log("Fichiers data mis à jour", "save")
 
 if __name__ == "__main__":
@@ -99,7 +93,7 @@ if __name__ == "__main__":
     if not game_id:
         raise SystemExit(1)
 
-    fen = fetch_current_fen(game_id)
+    fen, last_move = fetch_current_fen(game_id)
     if not fen:
         raise SystemExit(1)
 
@@ -107,9 +101,18 @@ if __name__ == "__main__":
         log("Ce n'est pas aux Noirs de jouer, arrêt.", "info")
         raise SystemExit(0)
 
-    move_played = play_black_move(game_id, fen)
-    if move_played:
-        new_fen = fetch_current_fen(game_id)
-        if new_fen:
-            update_data_files(new_fen, move_played)
-            log("Coup noir joué et fichiers mis à jour.", "ok")
+    # On déclenche le bot
+    trigger_bot_workflow()
+
+    # Petit délai pour qu'il joue
+    import time
+    log("⏳ Attente que le bot joue...", "wait")
+    time.sleep(15)  # Ajuster si nécessaire
+
+    # On relit la position et on met à jour les fichiers
+    fen_after, last_move_after = fetch_current_fen(game_id)
+    if fen_after and last_move_after != last_move:
+        update_data_files(fen_after, last_move_after)
+        log("Coup noir joué et fichiers mis à jour.", "ok")
+    else:
+        log("⚠️ Aucun nouveau coup détecté après passage du bot.", "warn")
