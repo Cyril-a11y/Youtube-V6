@@ -1,4 +1,4 @@
-# 05_play_black.py — version robuste avec reconstruction FEN depuis PGN
+# 05_play_black.py — version robuste avec reconstruction FEN depuis PGN + logs détaillés
 
 import os
 import json
@@ -12,7 +12,7 @@ from datetime import datetime, timezone
 # ----- Config / chemins
 REPO = "Cyril-a11y/Youtube-V6"             # <-- adapte si besoin
 BOT_WORKFLOW_FILE = "run-lichess-bot.yml"  # nom exact du fichier .yml du bot
-GITHUB_TOKEN = os.getenv("GH_WORKFLOW_TOKEN")  # On force le secret perso
+GITHUB_TOKEN = os.getenv("GH_WORKFLOW_TOKEN")  # Secret GitHub
 
 LICHESS_BOT_TOKEN = os.getenv("LICHESS_BOT_TOKEN")
 GAME_ID_FILE      = Path("data/game_id.txt")
@@ -53,18 +53,23 @@ def fetch_game_state(game_id):
     fen = data.get("fen")
     moves_str = data.get("moves") or ""
 
-    # Si Lichess ne renvoie pas la FEN, on la reconstruit depuis le PGN
-    if not fen and "pgn" in data:
-        try:
-            pgn_io = io.StringIO(data["pgn"])
-            game = chess.pgn.read_game(pgn_io)
-            board = game.board()
-            for move in game.mainline_moves():
-                board.push(move)
-            fen = board.fen()
-            log("FEN reconstruite depuis le PGN", "🔄")
-        except Exception as e:
-            log(f"Impossible de reconstruire la FEN depuis le PGN: {e}", "❌")
+    if fen:
+        log("✅ FEN reçue directement depuis l'API Lichess")
+    else:
+        if "pgn" in data:
+            try:
+                pgn_io = io.StringIO(data["pgn"])
+                game = chess.pgn.read_game(pgn_io)
+                board = game.board()
+                for move in game.mainline_moves():
+                    board.push(move)
+                fen = board.fen()
+                log("🔄 FEN reconstruite depuis le PGN")
+            except Exception as e:
+                log(f"Impossible de reconstruire la FEN depuis le PGN: {e}", "❌")
+                return None, None
+        else:
+            log("❌ Pas de FEN ni de PGN dans la réponse API", "❌")
             return None, None
 
     log(f"FEN: {fen}")
