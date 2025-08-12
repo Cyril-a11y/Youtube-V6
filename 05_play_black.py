@@ -1,4 +1,4 @@
-# 05_play_black.py — version "FEN direct" + déclenchement du bot workflow
+# 05_play_black.py — version "FEN direct" + déclenchement du bot workflow via secret GH_WORKFLOW_TOKEN
 
 import os
 import json
@@ -9,8 +9,8 @@ from datetime import datetime, timezone
 
 # ----- Config / chemins
 REPO = "Cyril-a11y/Youtube-V6"             # <-- adapte si besoin
-BOT_WORKFLOW_FILE = "run-bot.yml"          # nom exact du workflow bot
-GITHUB_TOKEN = os.getenv("GH_WORKFLOW_TOKEN") or os.getenv("GITHUB_TOKEN")
+BOT_WORKFLOW_FILE = "run-lichess-bot.yml"  # nom exact du fichier .yml du bot
+GITHUB_TOKEN = os.getenv("GH_WORKFLOW_TOKEN")  # On force le secret perso
 
 LICHESS_BOT_TOKEN = os.getenv("LICHESS_BOT_TOKEN")
 GAME_ID_FILE      = Path("data/game_id.txt")
@@ -31,7 +31,7 @@ def load_game_id():
     return gid
 
 def fetch_game_state(game_id):
-    """Retourne (fen, moves_str) depuis l’API Lichess (sans reconstruction locale)."""
+    """Retourne (fen, moves_str) depuis l’API Lichess."""
     url = f"https://lichess.org/game/export/{game_id}"
     params = {"fen": "1", "moves": "1"}
     headers = {"Authorization": f"Bearer {LICHESS_BOT_TOKEN}", "Accept": "application/json"}
@@ -59,9 +59,9 @@ def is_black_to_move(fen: str) -> bool:
         return False
 
 def trigger_bot_workflow():
-    """Déclenche le workflow bot (run-bot.yml) via l’API GitHub Actions."""
+    """Déclenche le workflow bot via API GitHub."""
     if not GITHUB_TOKEN:
-        log("Pas de token GitHub pour déclencher le workflow (GH_WORKFLOW_TOKEN / GITHUB_TOKEN).", "❌")
+        log("Pas de GH_WORKFLOW_TOKEN défini dans les secrets GitHub.", "❌")
         return False
     url = f"https://api.github.com/repos/{REPO}/actions/workflows/{BOT_WORKFLOW_FILE}/dispatches"
     headers = {
@@ -78,9 +78,7 @@ def trigger_bot_workflow():
     return False
 
 def update_files_after_black(move_san_or_uci: str, fen: str):
-    # position.fen
     FEN_FILE.write_text(fen or "", encoding="utf-8")
-    # dernier_coup.json
     LAST_MOVE_FILE.write_text(
         json.dumps({
             "dernier_coup": move_san_or_uci,
@@ -89,7 +87,6 @@ def update_files_after_black(move_san_or_uci: str, fen: str):
         }, ensure_ascii=False, indent=2),
         encoding="utf-8"
     )
-    # move_history.json
     history = []
     if MOVE_HISTORY_FILE.exists():
         try:
@@ -131,25 +128,20 @@ if __name__ == "__main__":
         log("Ce n'est pas aux Noirs de jouer — arrêt propre.", "ℹ️")
         raise SystemExit(0)
 
-    # Déclenche le bot
     if not trigger_bot_workflow():
-        # On ne stoppe pas brutalement : on informe et sort proprement
         raise SystemExit(0)
 
-    # Petite fenêtre d’attente (courte) pour laisser le bot jouer
-    for i in range(6):  # ~ 6 * 3s = 18s max
+    for i in range(10):  # ~ 10 * 3s = 30s max
         time.sleep(3)
         fen_after, moves_after = fetch_game_state(gid)
         if not fen_after:
             continue
-
         if moves_after != moves_before:
-            # Un nouveau coup a été ajouté (on prend le dernier token textuel comme info)
             coup = last_token(moves_after) or "unknown"
-            log(f"Nouveau coup détecté (dernier token): {coup}")
+            log(f"Nouveau coup détecté: {coup}")
             update_files_after_black(coup, fen_after)
             break
         else:
             log("Pas encore de nouveau coup… on réessaie.", "⏳")
     else:
-        log("⚠️ Le bot n'a pas joué dans le délai court. Réessaie plus tard ou vérifie run-bot.yml.", "⚠️")
+        log("⚠️ Le bot n'a pas joué dans le délai imparti. Vérifie le workflow du bot.", "⚠️")
