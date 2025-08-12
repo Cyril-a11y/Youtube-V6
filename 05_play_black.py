@@ -1,9 +1,11 @@
-# 05_play_black.py — version "FEN direct" + déclenchement du bot workflow via secret GH_WORKFLOW_TOKEN
+# 05_play_black.py — version robuste avec reconstruction FEN depuis PGN
 
 import os
 import json
 import time
 import requests
+import io
+import chess.pgn
 from pathlib import Path
 from datetime import datetime, timezone
 
@@ -31,23 +33,40 @@ def load_game_id():
     return gid
 
 def fetch_game_state(game_id):
-    """Retourne (fen, moves_str) depuis l’API Lichess."""
+    """Retourne (fen, moves_str) en se basant sur la FEN ou en la reconstruisant via le PGN."""
     url = f"https://lichess.org/game/export/{game_id}"
-    params = {"fen": "1", "moves": "1"}
+    params = {"fen": "1", "moves": "1", "pgn": "1"}
     headers = {"Authorization": f"Bearer {LICHESS_BOT_TOKEN}", "Accept": "application/json"}
-    log(f"📤 GET {url}?fen=1&moves=1")
+    log(f"📤 GET {url}?fen=1&moves=1&pgn=1")
     r = requests.get(url, params=params, headers=headers, timeout=20)
     log(f"📥 HTTP {r.status_code}")
     if r.status_code != 200:
         log(f"Réponse: {r.text[:300]}", "❌")
         return None, None
+
     try:
         data = r.json()
     except Exception as e:
         log(f"JSON invalide: {e}", "❌")
         return None, None
+
     fen = data.get("fen")
     moves_str = data.get("moves") or ""
+
+    # Si Lichess ne renvoie pas la FEN, on la reconstruit depuis le PGN
+    if not fen and "pgn" in data:
+        try:
+            pgn_io = io.StringIO(data["pgn"])
+            game = chess.pgn.read_game(pgn_io)
+            board = game.board()
+            for move in game.mainline_moves():
+                board.push(move)
+            fen = board.fen()
+            log("FEN reconstruite depuis le PGN", "🔄")
+        except Exception as e:
+            log(f"Impossible de reconstruire la FEN depuis le PGN: {e}", "❌")
+            return None, None
+
     log(f"FEN: {fen}")
     log(f"Moves (taille): {len(moves_str.split())}")
     return fen, moves_str
