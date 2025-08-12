@@ -44,14 +44,14 @@ jobs:
         run: python 03_process_comments.py
         continue-on-error: true
 
-      # 6. Commit coup_blanc.txt (si modifié)
+      # 6. Commit coup_blanc.txt
       - name: Commit coup_blanc.txt
         run: |
           git config user.name "github-actions"
           git config user.email "actions@github.com"
           git pull --rebase origin main || true
           git add data/coup_blanc.txt
-          git diff --cached --quiet || git commit -m "Update coup_blanc.txt [skip ci]"
+          git commit -m "Update coup_blanc.txt [skip ci]" || echo "No changes to commit"
           git push --force-with-lease origin main
 
       # 7. Jouer le coup blanc
@@ -64,12 +64,12 @@ jobs:
         run: python 05_play_black.py
         continue-on-error: true
 
-      # 9. Commit et push tous les fichiers mis à jour (si modifiés)
+      # 9. Commit et push tous les fichiers mis à jour
       - name: Commit updated game data
         run: |
           git config user.name "github-actions"
           git config user.email "actions@github.com"
           git pull --rebase origin main || true
           git add data/position.fen data/dernier_coup.json data/move_history.json || true
-          git diff --cached --quiet || git commit -m "Update game state after moves [skip ci]"
+          git commit -m "Update game state after moves [skip ci]" || echo "No changes to commit"
           git push --force-with-lease origin main
