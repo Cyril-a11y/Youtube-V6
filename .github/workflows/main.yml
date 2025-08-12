@@ -36,14 +36,14 @@ jobs:
       - name: Ensure data folder exists
         run: mkdir -p data
 
-      # 5) Secrets → env (incl. GITHUB_TOKEN for Python dispatch)
+      # 5) Secrets → env (incl. GH_WORKFLOW_TOKEN pour 05_play_black.py)
       - name: Load secrets into environment
         run: |
           echo "YOUTUBE_API_KEY=${{ secrets.YOUTUBE_API_KEY }}" >> $GITHUB_ENV
           echo "YOUTUBE_VIDEO_ID=${{ secrets.YOUTUBE_VIDEO_ID }}" >> $GITHUB_ENV
           echo "LICHESS_HUMAN_TOKEN=${{ secrets.LICHESS_HUMAN_TOKEN }}" >> $GITHUB_ENV
           echo "LICHESS_BOT_TOKEN=${{ secrets.LICHESS_BOT_TOKEN }}" >> $GITHUB_ENV
-          echo "GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}" >> $GITHUB_ENV
+          echo "GH_WORKFLOW_TOKEN=${{ secrets.GH_WORKFLOW_TOKEN }}" >> $GITHUB_ENV  # ✅ token attendu par 05_play_black.py
 
       # 6) Comments → select white move
       - name: Process comments and select white move
@@ -69,7 +69,7 @@ jobs:
       - name: Short sync delay
         run: sleep 3
 
-      # 9) Play black move (script may dispatch run-bot.yml via GITHUB_TOKEN)
+      # 9) Play black move (script dispatch run_bot.yml via GH_WORKFLOW_TOKEN)
       - name: Play black move
         run: python 05_play_black.py
         continue-on-error: true
