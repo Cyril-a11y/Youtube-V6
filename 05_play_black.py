@@ -10,8 +10,8 @@ from pathlib import Path
 from datetime import datetime, timezone
 
 # ----- Config / chemins
-REPO = "Cyril-a11y/Youtube-V6"             # <-- adapte si besoin
-BOT_WORKFLOW_FILE = "run-lichess-bot.yml"  # nom exact du fichier .yml du bot
+REPO = "Cyril-a11y/Youtube-V6"     # <-- adapte si besoin
+BOT_WORKFLOW_FILE = "run_bot.yml"  # nom exact du fichier .yml du bot
 GITHUB_TOKEN = os.getenv("GH_WORKFLOW_TOKEN")  # Secret GitHub
 
 LICHESS_BOT_TOKEN = os.getenv("LICHESS_BOT_TOKEN")
@@ -92,7 +92,7 @@ def trigger_bot_workflow():
         "Authorization": f"Bearer {GITHUB_TOKEN}",
         "Accept": "application/vnd.github+json"
     }
-    payload = {"ref": "main"}
+    payload = {"ref": "main"}  # Elo par défaut défini dans run_bot.yml
     log(f"🚀 Dispatch workflow: {BOT_WORKFLOW_FILE} sur main")
     r = requests.post(url, headers=headers, json=payload, timeout=20)
     if r.status_code == 204:
