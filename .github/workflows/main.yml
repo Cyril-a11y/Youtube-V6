@@ -48,9 +48,9 @@ jobs:
         run: |
           git config user.name "github-actions"
           git config user.email "actions@github.com"
-          git stash --all || true
+          git reset --hard HEAD
+          git clean -fd
           git pull --rebase origin main || true
-          git stash pop || true
           git add data/coup_blanc.txt || true
           git diff --cached --quiet || git commit -m "Update coup_blanc.txt [skip ci]"
           git push --force-with-lease origin main || true
@@ -70,9 +70,9 @@ jobs:
         run: |
           git config user.name "github-actions"
           git config user.email "actions@github.com"
-          git stash --all || true
+          git reset --hard HEAD
+          git clean -fd
           git pull --rebase origin main || true
-          git stash pop || true
           git add data/position.fen data/dernier_coup.json data/move_history.json || true
           git diff --cached --quiet || git commit -m "Update game state after moves [skip ci]"
           git push --force-with-lease origin main || true
@@ -85,9 +85,9 @@ jobs:
         run: |
           git config user.name "github-actions"
           git config user.email "actions@github.com"
-          git stash --all || true
+          git reset --hard HEAD
+          git clean -fd
           git pull --rebase origin main || true
-          git stash pop || true
           git add data/thumbnail_black.svg || true
           git diff --cached --quiet || git commit -m "Update black thumbnail [skip ci]"
           git push --force-with-lease origin main || true
