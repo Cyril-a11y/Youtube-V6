@@ -25,6 +25,7 @@ GAME_ID_FILE = DATA_DIR / "game_id.txt"
 POSITION_FILE = DATA_DIR / "position.fen"
 LAST_MOVE_FILE = DATA_DIR / "dernier_coup.json"
 COUP_BLANCS_FILE = DATA_DIR / "coup_blanc.txt"
+MOVE_HISTORY_FILE = DATA_DIR / "move_history.json"  # ✅ ajouté
 
 # Alias pour compatibilité
 FEN_FILE = POSITION_FILE
