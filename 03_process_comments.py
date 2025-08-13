@@ -4,7 +4,6 @@ import json
 import re
 import unicodedata
 import chess
-import chess.pgn
 import io
 import sys
 from collections import Counter
@@ -192,12 +191,16 @@ def sauvegarder_coup_blanc(coup_uci: str | None):
 
 def fetch_current_board_from_lichess(game_id):
     """
-    Récupère l'état exact de la partie depuis Lichess en lisant tous les coups
-    depuis l'API /game/export, puis les applique à un plateau initial.
+    Récupère l'état exact de la partie depuis Lichess en JSON
+    pour éviter les problèmes de PGN pas à jour.
     """
-    url = f"https://lichess.org/game/export/{game_id}?pgn=1&clocks=0&evaluations=0&literate=0&moves=1&tags=1"
-    headers = {"Authorization": f"Bearer {LICHESS_HUMAN_TOKEN}"}
-
+    import time
+    timestamp = int(time.time())
+    url = f"https://lichess.org/api/game/{game_id}?moves=1&clocks=0&evals=0&opening=0&t={timestamp}"
+    headers = {
+        "Authorization": f"Bearer {LICHESS_HUMAN_TOKEN}",
+        "Accept": "application/json"
+    }
     try:
         r = requests.get(url, headers=headers, timeout=30)
     except Exception as e:
@@ -208,19 +211,32 @@ def fetch_current_board_from_lichess(game_id):
         log(f"Erreur API Lichess : {r.status_code} {r.text[:200]}", "err")
         return None
 
-    pgn_str = r.text.strip()
-    if not pgn_str:
-        log("PGN vide reçu", "err")
+    try:
+        data = r.json()
+    except Exception as e:
+        log(f"Impossible de décoder le JSON Lichess : {e}", "err")
         return None
 
-    game = chess.pgn.read_game(io.StringIO(pgn_str))
-    if not game:
-        log("Impossible de parser le PGN", "err")
-        return None
+    moves_str = data.get("moves", "")
+    if not moves_str.strip():
+        log("Aucun coup trouvé dans la partie", "warn")
+        board = chess.Board()
+        log(f"Plateau initial, trait: {'blancs' if board.turn == chess.WHITE else 'noirs'}", "ok")
+        return board
 
-    board = game.board()
-    for move in game.mainline_moves():
-        board.push(move)
+    moves_list = moves_str.strip().split()
+    board = chess.Board()
+    for move_uci in moves_list:
+        try:
+            move = chess.Move.from_uci(move_uci)
+            if move in board.legal_moves:
+                board.push(move)
+            else:
+                log(f"⚠️ Coup illégal dans la séquence: {move_uci}", "warn")
+                break
+        except Exception as e:
+            log(f"⚠️ Erreur lors du push du coup '{move_uci}': {e}", "warn")
+            break
 
     log(f"Plateau reconstruit depuis la liste complète des coups, trait: {'blancs' if board.turn == chess.WHITE else 'noirs'}", "ok")
     return board
