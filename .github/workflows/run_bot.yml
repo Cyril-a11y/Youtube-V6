@@ -50,6 +50,7 @@ jobs:
           # 2) Trouver le meilleur coup avec Stockfish
           cat > play_move.py <<'PY'
 import os, chess, chess.engine, requests
+
 fen = os.environ["FEN"]
 game_id = os.environ["GAME_ID"]
 elo = int(os.environ.get("BOT_ELO", 1500))
@@ -74,5 +75,5 @@ r = requests.post(url, headers={"Authorization": f"Bearer {token}"})
 print(f"📤 POST {url} -> {r.status_code} {r.text}")
 PY
 
-          # 4) Exécuter le script Python
+          # 3bis) Exécuter le script Python
           FEN="$FEN" GAME_ID="$GAME_ID" BOT_ELO="$BOT_ELO" python3 play_move.py
