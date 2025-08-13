@@ -62,14 +62,15 @@ jobs:
           echo "BOT_ELO=${{ github.event.inputs.elo }}" >> $GITHUB_ENV
           echo "GAME_ID=${{ github.event.inputs.game_id }}" >> $GITHUB_ENV
 
-      - name: Vérification du nom du bot
+      - name: Vérification du nom du bot et cohérence du token
         run: |
           set -e
           mkdir -p data
           BOT_NAME=$(curl -s -H "Authorization: Bearer $LICHESS_BOT_TOKEN" https://lichess.org/api/account | jq -r '.username')
           echo "$BOT_NAME" > data/bot_name.txt
+          echo "🔍 Bot détecté : $BOT_NAME"
           if [ -n "$LICHESS_BOT_USERNAME" ] && [ "$BOT_NAME" != "$LICHESS_BOT_USERNAME" ]; then
-            echo "❌ ERREUR : Le token ne correspond pas au compte attendu."
+            echo "❌ ERREUR : Le token ne correspond pas au compte attendu ($LICHESS_BOT_USERNAME)."
             exit 1
           fi
 
@@ -110,5 +111,7 @@ jobs:
           GAME_ID: ${{ env.GAME_ID }}
         run: |
           echo "== Starting lichess-bot for game $GAME_ID =="
+          # Vérification si le GAME_ID est accessible
+          curl -s -H "Authorization: Bearer $LICHESS_BOT_TOKEN" https://lichess.org/game/export/$GAME_ID?moves=1 | head -c 200
           python lichess-bot.py --join $GAME_ID -vv --logfile /dev/stdout
           echo "== Bot finished running, workflow ending =="
