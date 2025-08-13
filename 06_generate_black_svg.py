@@ -9,7 +9,6 @@ from pathlib import Path
 from wand.image import Image
 from wand.color import Color
 from dataclasses import dataclass
-from config import LAST_MOVE_FILE
 
 # --- Fichiers ---
 DATA_DIR = Path("data")
@@ -75,15 +74,8 @@ for move in game.mainline_moves():
     moves_list.append(board.san(move))
     board.push(move)
 
-# --- Dernier coup ---
-last_move = None
-if LAST_MOVE_FILE.exists():
-    try:
-        with open(LAST_MOVE_FILE, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        last_move = data.get("dernier_coup_uci") or data.get("dernier_coup")
-    except Exception:
-        pass
+# --- Dernier coup depuis PGN ---
+last_san = moves_list[-1] if moves_list else "?"
 
 # --- Historique formaté ---
 def format_history_lines(moves):
@@ -95,7 +87,7 @@ svg_echiquier = chess.svg.board(
     board=board,
     orientation=chess.BLACK,
     size=620,
-    lastmove=chess.Move.from_uci(last_move) if last_move else None
+    lastmove=board.peek() if board.move_stack else None
 )
 svg_echiquier = _force_board_colors(svg_echiquier)
 
@@ -127,7 +119,7 @@ svg_final = f"""<?xml version="1.0" encoding="UTF-8" standalone="no"?>
     {svg_echiquier}
   </g>
   <text x="700" y="180" font-size="28" font-family="Ubuntu" fill="#111">
-    Dernier coup : {last_move or "?"}
+    Dernier coup : {last_san}
   </text>
   <text x="700" y="230" font-size="30" font-family="Ubuntu" fill="#111">
     🧠 Choisissez le prochain coup !
