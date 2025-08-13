@@ -9,10 +9,10 @@ import chess.pgn
 from pathlib import Path
 from datetime import datetime, timezone
 
-# ----- Config / chemins
-REPO = "Cyril-a11y/Youtube-V6"     # <-- adapte si besoin
-BOT_WORKFLOW_FILE = "180821453"    # ID unique du workflow run_bot.yml
-GITHUB_TOKEN = os.getenv("GH_WORKFLOW_TOKEN")  # Secret GitHub
+# ----- Config / chemins -----
+REPO = "Cyril-a11y/Youtube-V6"                # Nom du repo GitHub
+BOT_WORKFLOW_FILE = ".github/workflows/run_bot.yml"  # Chemin vers le workflow
+GITHUB_TOKEN = os.getenv("GH_WORKFLOW_TOKEN")        # Secret GitHub
 
 LICHESS_BOT_TOKEN = os.getenv("LICHESS_BOT_TOKEN")
 GAME_ID_FILE      = Path("data/game_id.txt")
@@ -23,7 +23,7 @@ MOVE_HISTORY_FILE = Path("data/move_history.json")
 def log(msg, tag="ℹ️"):
     print(f"{tag} {msg}")
 
-# ----- Helpers
+# ----- Helpers -----
 def load_game_id():
     if not GAME_ID_FILE.exists():
         log("game_id.txt introuvable", "❌")
@@ -56,7 +56,7 @@ def fetch_game_state(game_id):
     except Exception:
         pass  # Pas du JSON → on passe au PGN brut
 
-    # PGN brut → on reconstruit
+    # PGN brut → reconstruction
     pgn_text = r.text.strip()
     try:
         pgn_io = io.StringIO(pgn_text)
@@ -99,7 +99,7 @@ def trigger_bot_workflow(game_id: str, elo: str = "1500"):
         }
     }
 
-    log(f"🚀 Dispatch workflow ID={BOT_WORKFLOW_FILE} avec game_id={game_id} et elo={elo}")
+    log(f"🚀 Dispatch workflow {BOT_WORKFLOW_FILE} avec game_id={game_id} et elo={elo}")
     r = requests.post(url, headers=headers, json=payload, timeout=20)
 
     if r.status_code == 204:
@@ -140,7 +140,7 @@ def last_token(moves_str: str) -> str | None:
     toks = (moves_str or "").split()
     return toks[-1] if toks else None
 
-# ----- Main
+# ----- Main -----
 if __name__ == "__main__":
     if not LICHESS_BOT_TOKEN:
         log("LICHESS_BOT_TOKEN manquant.", "❌")
