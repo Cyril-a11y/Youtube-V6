@@ -80,23 +80,33 @@ def is_black_to_move(fen: str) -> bool:
     except Exception:
         return False
 
-def trigger_bot_workflow():
-    """Déclenche le workflow bot via API GitHub."""
+def trigger_bot_workflow(game_id: str, elo: str = "1500"):
+    """Déclenche le workflow bot via API GitHub avec game_id et elo."""
     if not GITHUB_TOKEN:
         log("Pas de GH_WORKFLOW_TOKEN défini dans les secrets GitHub.", "❌")
         return False
+
     url = f"https://api.github.com/repos/{REPO}/actions/workflows/{BOT_WORKFLOW_FILE}/dispatches"
     headers = {
         "Authorization": f"Bearer {GITHUB_TOKEN}",
         "Accept": "application/vnd.github+json"
     }
-    payload = {"ref": "main"}  # Elo par défaut défini dans run_bot.yml
-    log(f"🚀 Dispatch workflow: {BOT_WORKFLOW_FILE} sur main")
+    payload = {
+        "ref": "main",
+        "inputs": {
+            "game_id": game_id,
+            "elo": elo
+        }
+    }
+
+    log(f"🚀 Dispatch workflow: {BOT_WORKFLOW_FILE} avec game_id={game_id} et elo={elo}")
     r = requests.post(url, headers=headers, json=payload, timeout=20)
+
     if r.status_code == 204:
         log("Workflow bot déclenché.", "✅")
         return True
-    log(f"Échec dispatch ({r.status_code}): {r.text}", "❌")
+
+    log(f"❌ Échec dispatch ({r.status_code}): {r.text}", "❌")
     return False
 
 def update_files_after_black(move_san_or_uci: str, fen: str):
@@ -150,7 +160,7 @@ if __name__ == "__main__":
         log("Ce n'est pas aux Noirs de jouer — arrêt propre.", "ℹ️")
         raise SystemExit(0)
 
-    if not trigger_bot_workflow():
+    if not trigger_bot_workflow(gid, elo="1500"):
         raise SystemExit(0)
 
     for i in range(10):  # ~ 10 * 3s = 30s max
