@@ -55,9 +55,9 @@ jobs:
           echo "$RESPONSE" > data/game.pgn
           echo "✅ PGN sauvegardé dans data/game.pgn"
 
-          # 2) Script Python
+          # 2) Script Python pour jouer le coup noir et mettre à jour les fichiers
           cat > play_move.py <<'PY'
-          import os, json, chess.pgn, chess.engine, requests
+          import os, json, shutil, chess.pgn, chess.engine, requests
           from pathlib import Path
           from datetime import datetime, timezone
 
@@ -65,6 +65,7 @@ jobs:
           elo = int(os.environ.get("BOT_ELO", 1500))
           token = os.environ["LICHESS_BOT_TOKEN"]
 
+          # Lire le PGN et reconstruire la position
           with open("data/game.pgn", "r", encoding="utf-8") as f:
               game = chess.pgn.read_game(f)
 
@@ -81,7 +82,14 @@ jobs:
               print("❌ Ce n'est pas aux Noirs de jouer.")
               exit(0)
 
-          engine = chess.engine.SimpleEngine.popen_uci("/usr/bin/stockfish")
+          # Trouver le binaire Stockfish
+          stockfish_path = shutil.which("stockfish")
+          if not stockfish_path:
+              print("❌ Stockfish introuvable")
+              exit(1)
+
+          # Calculer le coup noir
+          engine = chess.engine.SimpleEngine.popen_uci(stockfish_path)
           engine.configure({"UCI_LimitStrength": True, "UCI_Elo": elo})
           result = engine.play(board, chess.engine.Limit(time=1.0))
           move = result.move
@@ -100,7 +108,7 @@ jobs:
           if r.status_code != 200:
               exit(1)
 
-          # Sauvegarde des fichiers après le coup
+          # Sauvegarder la position mise à jour
           fen_after = board.fen()
           Path("data/position.fen").write_text(fen_after, encoding="utf-8")
 
