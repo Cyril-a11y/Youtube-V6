@@ -21,6 +21,11 @@ jobs:
     timeout-minutes: 5
 
     steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
       - name: Install Stockfish & Python deps
         run: |
           sudo apt-get update
@@ -28,16 +33,17 @@ jobs:
           python3 -m pip install --upgrade pip
           python3 -m pip install python-chess requests
 
-      - name: Play best black move from PGN
+      - name: Play best black move from PGN and update files
         env:
           LICHESS_BOT_TOKEN: ${{ secrets.LICHESS_BOT_TOKEN }}
           GAME_ID: ${{ github.event.inputs.game_id }}
           BOT_ELO: ${{ github.event.inputs.elo }}
         run: |
-          echo "♟️ Game ID: $GAME_ID"
           mkdir -p data
 
-          # 1) Récupérer le PGN brut depuis Lichess
+          echo "♟️ Game ID: $GAME_ID"
+
+          # 1) Télécharger le PGN brut depuis Lichess
           RESPONSE=$(curl -s -H "Authorization: Bearer $LICHESS_BOT_TOKEN" \
             "https://lichess.org/game/export/$GAME_ID?pgn=1&clocks=0&evals=0&literate=0")
 
@@ -49,9 +55,10 @@ jobs:
           echo "$RESPONSE" > data/game.pgn
           echo "✅ PGN sauvegardé dans data/game.pgn"
 
-          # 2) Script Python : afficher les coups + jouer le coup noir
+          # 2) Script Python : reconstruire, jouer et mettre à jour les fichiers
           cat > play_move.py <<'PY'
-          import os, chess.pgn, chess.engine, requests
+          import os, json, chess.pgn, chess.engine, requests
+          from datetime import datetime, timezone
 
           game_id = os.environ["GAME_ID"]
           elo = int(os.environ.get("BOT_ELO", 1500))
@@ -81,10 +88,55 @@ jobs:
 
           print(f"🤖 Coup choisi: {move.uci()}")
 
+          # Envoyer le coup à Lichess
           url = f"https://lichess.org/api/board/game/{game_id}/move/{move.uci()}"
           headers = {"Authorization": f"Bearer {token}"}
           r = requests.post(url, headers=headers)
           print(f"📤 POST {url} -> {r.status_code} {r.text}")
+          if r.status_code != 200:
+              exit(1)
+
+          # Mettre à jour les fichiers
+          fen_after = board.fen()
+          position_file = "data/position.fen"
+          last_move_file = "data/dernier_coup.json"
+          move_history_file = "data/move_history.json"
+
+          Path(position_file).write_text(fen_after, encoding="utf-8")
+          Path(last_move_file).write_text(
+              json.dumps({
+                  "dernier_coup": move.uci(),
+                  "fen": fen_after,
+                  "horodatage": datetime.now(timezone.utc).isoformat()
+              }, ensure_ascii=False, indent=2),
+              encoding="utf-8"
+          )
+
+          history = []
+          if Path(move_history_file).exists():
+              try:
+                  history = json.loads(Path(move_history_file).read_text(encoding="utf-8"))
+                  if not isinstance(history, list):
+                      history = []
+              except Exception:
+                  history = []
+          history.append({
+              "couleur": "noir",
+              "coup": move.uci(),
+              "fen_apres": fen_after,
+              "horodatage": datetime.now(timezone.utc).isoformat()
+          })
+          Path(move_history_file).write_text(json.dumps(history, ensure_ascii=False, indent=2), encoding="utf-8")
+
+          print("✅ position.fen, dernier_coup.json, move_history.json mis à jour")
           PY
 
           python3 play_move.py
+
+      - name: Commit updated files
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add data/position.fen data/dernier_coup.json data/move_history.json
+          git commit -m "MAJ après coup noir"
+          git push
