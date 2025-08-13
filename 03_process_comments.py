@@ -15,13 +15,14 @@ from pathlib import Path
 YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY")
 YOUTUBE_VIDEO_ID = os.getenv("YOUTUBE_VIDEO_ID")
 LICHESS_HUMAN_TOKEN = os.getenv("LICHESS_HUMAN_TOKEN")
+LICHESS_BOT_TOKEN = os.getenv("LICHESS_BOT_TOKEN")
 LAST_MOVE_FILE = "data/dernier_coup.json"
 GAME_ID_FILE = "data/game_id.txt"
 COUP_BLANCS_FILE = Path("data/coup_blanc.txt")
 
 # Vérification des secrets
 missing = []
-for var in ["YOUTUBE_API_KEY", "YOUTUBE_VIDEO_ID", "LICHESS_HUMAN_TOKEN"]:
+for var in ["YOUTUBE_API_KEY", "YOUTUBE_VIDEO_ID", "LICHESS_BOT_TOKEN"]:
     if not globals()[var]:
         missing.append(var)
 if missing:
@@ -61,9 +62,6 @@ def charger_horodatage_dernier_coup():
         Path(LAST_MOVE_FILE).parent.mkdir(parents=True, exist_ok=True)
         data = {"horodatage": datetime(1970, 1, 1, tzinfo=timezone.utc).isoformat()}
         Path(LAST_MOVE_FILE).write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
-        return datetime(1970, 1, 1, tzinfo=timezone.utc)
-    except Exception as e:
-        log(f"Timestamp illisible ({e}), utilisation d'une date par défaut.", "warn")
         return datetime(1970, 1, 1, tzinfo=timezone.utc)
 
 def recuperer_commentaires(video_id, max_results=100, apres=None):
@@ -112,15 +110,12 @@ def nettoyer_et_corriger_san(commentaire: str) -> str:
                .replace("0-0-0", "O-O-O").replace("o-o-o", "O-O-O")
                .replace("0-0", "O-O").replace("o-o", "O-O"))
     txt = _sans_accents(raw.lower())
-
     if re.search(r"\b(grand\s*roque|roque\s*long|cote\s*dame|rochade\s*longue)\b", txt):
         return "O-O-O"
     if re.search(r"\b(petit\s*roque|roque\s*court|cote\s*roi|rochade\s*courte)\b", txt) or re.fullmatch(r"\s*roque\s*", txt):
         return "O-O"
-
     if re.fullmatch(r"[A-H][1-8]", raw):
         raw = raw.lower()
-
     cleaned = re.sub(r"[^a-hA-H1-8NBRQKCTFDRxXO\-+=#]", "", raw)
     trad = {"C": "N", "F": "B", "T": "R", "D": "Q", "R": "K"}
     if cleaned[:1] in trad:
@@ -190,11 +185,11 @@ def sauvegarder_coup_blanc(coup_uci: str | None):
 
 def fetch_current_board_from_lichess(game_id):
     """
-    Utilise l'API stream pour avoir l'état exact et à jour de la partie.
+    Utilise le flux bot pour récupérer la position exacte à jour.
     """
     url = f"https://lichess.org/api/bot/game/stream/{game_id}"
     headers = {
-        "Authorization": f"Bearer {LICHESS_HUMAN_TOKEN}",
+        "Authorization": f"Bearer {LICHESS_BOT_TOKEN}",
         "Accept": "application/x-ndjson"
     }
     try:
@@ -202,43 +197,27 @@ def fetch_current_board_from_lichess(game_id):
     except Exception as e:
         log(f"Erreur réseau Lichess : {e}", "err")
         return None
-
     if r.status_code != 200:
         log(f"Erreur API Lichess : {r.status_code} {r.text[:200]}", "err")
         return None
 
-    moves_list = []
+    last_moves = None
     for line in r.iter_lines():
         if not line:
             continue
         try:
             event = json.loads(line.decode("utf-8"))
-        except Exception:
+        except:
             continue
-        if "state" in event:
-            moves_str = event["state"].get("moves", "")
-        elif "moves" in event:
-            moves_str = event.get("moves", "")
-        else:
-            continue
-        if moves_str:
-            moves_list = moves_str.strip().split()
-            break  # On s'arrête dès qu'on a les coups
+        if "moves" in event:
+            last_moves = event["moves"].strip().split()
+    r.close()
 
     board = chess.Board()
-    for move_uci in moves_list:
-        try:
-            move = chess.Move.from_uci(move_uci)
-            if move in board.legal_moves:
-                board.push(move)
-            else:
-                log(f"⚠️ Coup illégal dans la séquence: {move_uci}", "warn")
-                break
-        except Exception as e:
-            log(f"⚠️ Erreur lors du push du coup '{move_uci}': {e}", "warn")
-            break
-
-    log(f"Plateau reconstruit depuis l'API stream, trait: {'blancs' if board.turn == chess.WHITE else 'noirs'}", "ok")
+    if last_moves:
+        for m in last_moves:
+            board.push_uci(m)
+    log(f"Plateau reconstruit depuis flux bot, trait: {'blancs' if board.turn == chess.WHITE else 'noirs'}", "ok")
     return board
 
 # -----------------------
@@ -249,25 +228,20 @@ if __name__ == "__main__":
         print("=== DÉBUT DU SCRIPT ===")
         dernier_coup_time = charger_horodatage_dernier_coup()
         commentaires = recuperer_commentaires(YOUTUBE_VIDEO_ID, apres=dernier_coup_time)
-
         if not commentaires:
             sauvegarder_coup_blanc(None)
             sys.exit(0)
-
         game_id = load_game_id()
         if not game_id:
             sauvegarder_coup_blanc(None)
             sys.exit(0)
-
         board = fetch_current_board_from_lichess(game_id)
         if not board:
             sauvegarder_coup_blanc(None)
             sys.exit(0)
-
         coups_valides_uci = extraire_coups_valides(board, commentaires)
         coup_choisi_uci = choisir_coup_majoritaire(coups_valides_uci)
         sauvegarder_coup_blanc(coup_choisi_uci)
-
         print("=== FIN DU SCRIPT ===")
     except Exception as e:
         log(f"Erreur non bloquante: {e}", "err")
