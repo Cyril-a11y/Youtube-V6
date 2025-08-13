@@ -16,27 +16,22 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1) Checkout
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      # 2) Python
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      # 3) Install dependencies
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      # 4) Ensure data dir
       - name: Ensure data folder exists
         run: mkdir -p data
 
-      # 5) Load secrets
       - name: Load secrets into environment
         run: |
           echo "YOUTUBE_API_KEY=${{ secrets.YOUTUBE_API_KEY }}" >> $GITHUB_ENV
@@ -45,60 +40,52 @@ jobs:
           echo "LICHESS_BOT_TOKEN=${{ secrets.LICHESS_BOT_TOKEN }}" >> $GITHUB_ENV
           echo "GH_WORKFLOW_TOKEN=${{ secrets.GH_WORKFLOW_TOKEN }}" >> $GITHUB_ENV
 
-      # 6) Process comments → coup_blanc.txt
       - name: Process comments and select white move
         run: python 03_process_comments.py
         continue-on-error: true
 
-      # 7) Commit coup_blanc.txt
       - name: Commit coup_blanc.txt
         run: |
           git config user.name "github-actions"
           git config user.email "actions@github.com"
-          git stash --include-untracked || true
+          git stash --all || true
           git pull --rebase origin main || true
           git stash pop || true
           git add data/coup_blanc.txt || true
           git diff --cached --quiet || git commit -m "Update coup_blanc.txt [skip ci]"
           git push --force-with-lease origin main || true
 
-      # 8) Play white move
       - name: Play white move
         run: python 04_play_white.py
         continue-on-error: true
 
-      # 9) Delay for Lichess sync
       - name: Short sync delay
         run: sleep 3
 
-      # 10) Play black move
       - name: Play black move
         run: python 05_play_black.py
         continue-on-error: true
 
-      # 11) Commit updated game state
       - name: Commit updated game data
         run: |
           git config user.name "github-actions"
           git config user.email "actions@github.com"
-          git stash --include-untracked || true
+          git stash --all || true
           git pull --rebase origin main || true
           git stash pop || true
           git add data/position.fen data/dernier_coup.json data/move_history.json || true
           git diff --cached --quiet || git commit -m "Update game state after moves [skip ci]"
           git push --force-with-lease origin main || true
 
-      # 12) Generate black SVG
       - name: Generate black SVG
         run: python 06_generate_black_svg.py
         continue-on-error: true
 
-      # 13) Commit black SVG
       - name: Commit SVG thumbnail
         run: |
           git config user.name "github-actions"
           git config user.email "actions@github.com"
-          git stash --include-untracked || true
+          git stash --all || true
           git pull --rebase origin main || true
           git stash pop || true
           git add data/thumbnail_black.svg || true
