@@ -86,7 +86,7 @@ jobs:
 
       # 11) Generate black SVG from latest position
       - name: Generate black SVG
-        run: python generate_black_svg.py
+        run: python 06_generate_black_svg.py
         continue-on-error: true
 
       # 12) Commit generated SVG (only if changed)
