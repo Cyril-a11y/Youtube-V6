@@ -1,4 +1,4 @@
-name: Run Lichess Bot (One-Shot Black Move)
+name: Run Lichess Bot (Direct Black Move via API)
 
 on:
   workflow_dispatch:
@@ -15,103 +15,64 @@ on:
 permissions:
   contents: write
 
-concurrency:
-  group: run-bot
-  cancel-in-progress: false
-
 jobs:
   bot:
     runs-on: ubuntu-latest
-    timeout-minutes: 15  # pas besoin de 6h pour un coup
+    timeout-minutes: 5
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Clone lichess-bot
-        run: git clone https://github.com/lichess-bot-devs/lichess-bot.git
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-      - name: Cache pip dependencies
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-lichess-bot-${{ hashFiles('lichess-bot/requirements.txt') }}
-          restore-keys: |
-            ${{ runner.os }}-pip-lichess-bot-
-
-      - name: Install Stockfish and dependencies
+      - name: Install Stockfish & Python deps
         run: |
           sudo apt-get update
-          sudo apt-get install -y stockfish jq
-          python -m pip install --upgrade pip
-          pip install -r lichess-bot/requirements.txt
-          which stockfish
-          stockfish --version
+          sudo apt-get install -y stockfish python3-pip jq
+          python3 -m pip install --upgrade pip
+          python3 -m pip install python-chess requests
 
-      - name: Load env variables
+      - name: Play best black move directly
+        env:
+          LICHESS_BOT_TOKEN: ${{ secrets.LICHESS_BOT_TOKEN }}
+          GAME_ID: ${{ github.event.inputs.game_id }}
+          BOT_ELO: ${{ github.event.inputs.elo }}
         run: |
-          echo "LICHESS_BOT_TOKEN=${{ secrets.LICHESS_BOT_TOKEN }}" >> $GITHUB_ENV
-          echo "LICHESS_BOT_USERNAME=${{ secrets.LICHESS_BOT_USERNAME }}" >> $GITHUB_ENV
-          echo "BOT_ELO=${{ github.event.inputs.elo }}" >> $GITHUB_ENV
-          echo "GAME_ID=${{ github.event.inputs.game_id }}" >> $GITHUB_ENV
-
-      - name: Vérification du nom du bot et cohérence du token
-        run: |
-          set -e
-          mkdir -p data
-          BOT_NAME=$(curl -s -H "Authorization: Bearer $LICHESS_BOT_TOKEN" https://lichess.org/api/account | jq -r '.username')
-          echo "$BOT_NAME" > data/bot_name.txt
-          echo "🔍 Bot détecté : $BOT_NAME"
-          if [ -n "$LICHESS_BOT_USERNAME" ] && [ "$BOT_NAME" != "$LICHESS_BOT_USERNAME" ]; then
-            echo "❌ ERREUR : Le token ne correspond pas au compte attendu ($LICHESS_BOT_USERNAME)."
+          echo "♟️ Game ID: $GAME_ID"
+          
+          # 1) Récupérer la FEN actuelle
+          FEN=$(curl -s -H "Authorization: Bearer $LICHESS_BOT_TOKEN" \
+            "https://lichess.org/game/export/$GAME_ID?fen=1&moves=0" \
+            | jq -r '.fen')
+          
+          if [ -z "$FEN" ] || [ "$FEN" = "null" ]; then
+            echo "❌ Impossible de récupérer la FEN."
             exit 1
           fi
+          echo "📌 FEN actuelle: $FEN"
 
-      - name: Write config.yml (accept all time controls + adjustable Elo)
-        run: |
-          mkdir -p lichess-bot
-          cat > lichess-bot/config.yml <<YML
-          token: "${LICHESS_BOT_TOKEN}"
+          # 2) Trouver le meilleur coup avec Stockfish
+          cat > play_move.py <<'PY'
+import os, chess, chess.engine, requests
+fen = os.environ["FEN"]
+game_id = os.environ["GAME_ID"]
+elo = int(os.environ.get("BOT_ELO", 1500))
+token = os.environ["LICHESS_BOT_TOKEN"]
 
-          engine:
-            name: stockfish
-            protocol: uci
-            cmd: /usr/bin/stockfish
-            ponder: false
-            uci_options:
-              Threads: 2
-              Hash: 128
-              UCI_LimitStrength: true
-              UCI_Elo: ${BOT_ELO}
+board = chess.Board(fen)
+if board.turn != chess.BLACK:
+    print("❌ Ce n'est pas aux Noirs de jouer.")
+    exit(0)
 
-          play:
-            rated: false
-            variants: [standard]
-            time_controls: any
-            log_moves: true
+engine = chess.engine.SimpleEngine.popen_uci("/usr/bin/stockfish")
+engine.configure({"UCI_LimitStrength": True, "UCI_Elo": elo})
+result = engine.play(board, chess.engine.Limit(time=1.0))
+move = result.move
+engine.quit()
 
-          challenge:
-            allow_bot: false
-            max_concurrent: 1
+print(f"🤖 Coup choisi: {move.uci()}")
 
-          abort_time: 20
-          YML
+# 3) Envoyer le coup à Lichess
+url = f"https://lichess.org/api/board/game/{game_id}/move/{move.uci()}"
+r = requests.post(url, headers={"Authorization": f"Bearer {token}"})
+print(f"📤 POST {url} -> {r.status_code} {r.text}")
+PY
 
-      - name: Play black move in existing game
-        working-directory: lichess-bot
-        env:
-          LICHESS_BOT_TOKEN: ${{ env.LICHESS_BOT_TOKEN }}
-          GAME_ID: ${{ env.GAME_ID }}
-        run: |
-          echo "== Starting lichess-bot for game $GAME_ID =="
-          # Vérification si le GAME_ID est accessible
-          curl -s -H "Authorization: Bearer $LICHESS_BOT_TOKEN" https://lichess.org/game/export/$GAME_ID?moves=1 | head -c 200
-          python lichess-bot.py --join $GAME_ID -vv --logfile /dev/stdout
-          echo "== Bot finished running, workflow ending =="
+          # 4) Exécuter le script Python
+          FEN="$FEN" GAME_ID="$GAME_ID" BOT_ELO="$BOT_ELO" python3 play_move.py
