@@ -55,9 +55,10 @@ jobs:
           echo "$RESPONSE" > data/game.pgn
           echo "✅ PGN sauvegardé dans data/game.pgn"
 
-          # 2) Script Python : reconstruire, jouer et mettre à jour les fichiers
+          # 2) Script Python
           cat > play_move.py <<'PY'
           import os, json, chess.pgn, chess.engine, requests
+          from pathlib import Path
           from datetime import datetime, timezone
 
           game_id = os.environ["GAME_ID"]
@@ -88,6 +89,9 @@ jobs:
 
           print(f"🤖 Coup choisi: {move.uci()}")
 
+          # Appliquer le coup sur le plateau
+          board.push(move)
+
           # Envoyer le coup à Lichess
           url = f"https://lichess.org/api/board/game/{game_id}/move/{move.uci()}"
           headers = {"Authorization": f"Bearer {token}"}
@@ -96,14 +100,11 @@ jobs:
           if r.status_code != 200:
               exit(1)
 
-          # Mettre à jour les fichiers
+          # Sauvegarde des fichiers après le coup
           fen_after = board.fen()
-          position_file = "data/position.fen"
-          last_move_file = "data/dernier_coup.json"
-          move_history_file = "data/move_history.json"
+          Path("data/position.fen").write_text(fen_after, encoding="utf-8")
 
-          Path(position_file).write_text(fen_after, encoding="utf-8")
-          Path(last_move_file).write_text(
+          Path("data/dernier_coup.json").write_text(
               json.dumps({
                   "dernier_coup": move.uci(),
                   "fen": fen_after,
@@ -112,10 +113,11 @@ jobs:
               encoding="utf-8"
           )
 
+          history_file = Path("data/move_history.json")
           history = []
-          if Path(move_history_file).exists():
+          if history_file.exists():
               try:
-                  history = json.loads(Path(move_history_file).read_text(encoding="utf-8"))
+                  history = json.loads(history_file.read_text(encoding="utf-8"))
                   if not isinstance(history, list):
                       history = []
               except Exception:
@@ -126,7 +128,7 @@ jobs:
               "fen_apres": fen_after,
               "horodatage": datetime.now(timezone.utc).isoformat()
           })
-          Path(move_history_file).write_text(json.dumps(history, ensure_ascii=False, indent=2), encoding="utf-8")
+          history_file.write_text(json.dumps(history, ensure_ascii=False, indent=2), encoding="utf-8")
 
           print("✅ position.fen, dernier_coup.json, move_history.json mis à jour")
           PY
