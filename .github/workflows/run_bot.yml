@@ -36,12 +36,12 @@ jobs:
         run: |
           echo "♟️ Game ID: $GAME_ID"
 
-          # 1) Récupérer la FEN actuelle avec vérification JSON
+          # 1) Récupérer la FEN actuelle depuis l’API Lichess (JSON vérifié)
           RESPONSE=$(curl -s -H "Authorization: Bearer $LICHESS_BOT_TOKEN" \
             "https://lichess.org/game/export/$GAME_ID?fen=1&moves=1&pgn=0")
 
           if ! echo "$RESPONSE" | jq . >/dev/null 2>&1; then
-            echo "❌ La réponse Lichess n'est pas du JSON valide:"
+            echo "❌ La réponse Lichess n'est pas du JSON valide :"
             echo "$RESPONSE"
             exit 1
           fi
@@ -54,7 +54,7 @@ jobs:
           fi
           echo "📌 FEN actuelle: $FEN"
 
-          # 2) Trouver le meilleur coup avec Stockfish
+          # 2) Script Python pour calculer et jouer le coup noir
           cat > play_move.py <<'PY'
 import os, chess, chess.engine, requests
 
@@ -76,11 +76,11 @@ engine.quit()
 
 print(f"🤖 Coup choisi: {move.uci()}")
 
-# 3) Envoyer le coup à Lichess
+# Envoyer le coup à Lichess
 url = f"https://lichess.org/api/board/game/{game_id}/move/{move.uci()}"
 r = requests.post(url, headers={"Authorization": f"Bearer {token}"})
 print(f"📤 POST {url} -> {r.status_code} {r.text}")
 PY
 
-          # 3bis) Exécuter le script Python
+          # 3) Exécuter le script Python
           FEN="$FEN" GAME_ID="$GAME_ID" BOT_ELO="$BOT_ELO" python3 play_move.py
