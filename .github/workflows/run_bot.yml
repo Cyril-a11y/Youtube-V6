@@ -3,6 +3,10 @@ name: Run Lichess Bot (One-Shot Black Move)
 on:
   workflow_dispatch:
     inputs:
+      game_id:
+        description: "ID de la partie Lichess"
+        required: true
+        type: string
       elo:
         description: "Elo simulé par Stockfish (1350–2850)"
         required: false
@@ -56,6 +60,7 @@ jobs:
           echo "LICHESS_BOT_TOKEN=${{ secrets.LICHESS_BOT_TOKEN }}" >> $GITHUB_ENV
           echo "LICHESS_BOT_USERNAME=${{ secrets.LICHESS_BOT_USERNAME }}" >> $GITHUB_ENV
           echo "BOT_ELO=${{ github.event.inputs.elo }}" >> $GITHUB_ENV
+          echo "GAME_ID=${{ github.event.inputs.game_id }}" >> $GITHUB_ENV
 
       - name: Vérification du nom du bot
         run: |
@@ -98,11 +103,12 @@ jobs:
           abort_time: 20
           YML
 
-      - name: Run lichess-bot once (stop after move)
+      - name: Play black move in existing game
         working-directory: lichess-bot
         env:
           LICHESS_BOT_TOKEN: ${{ env.LICHESS_BOT_TOKEN }}
+          GAME_ID: ${{ env.GAME_ID }}
         run: |
-          echo "== Starting lichess-bot to play the black move =="
-          python lichess-bot.py -vv --logfile /dev/stdout
+          echo "== Starting lichess-bot for game $GAME_ID =="
+          python lichess-bot.py --join $GAME_ID -vv --logfile /dev/stdout
           echo "== Bot finished running, workflow ending =="
