@@ -2,3 +2,4 @@ python-chess
 requests
 google-api-python-client
 python-dotenv
+wand
