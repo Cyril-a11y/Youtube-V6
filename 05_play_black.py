@@ -163,8 +163,8 @@ if __name__ == "__main__":
     if not trigger_bot_workflow(gid, elo="1500"):
         raise SystemExit(0)
 
-    for i in range(10):  # ~ 10 * 3s = 30s max
-        time.sleep(3)
+    for i in range(3):  # ~ 10 * 3s = 30s max
+        time.sleep(1)
         fen_after, moves_after = fetch_game_state(gid)
         if not fen_after:
             continue
