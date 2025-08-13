@@ -55,7 +55,7 @@ jobs:
         run: |
           git config user.name "github-actions"
           git config user.email "actions@github.com"
-          git stash || true
+          git stash --include-untracked || true
           git pull --rebase origin main || true
           git stash pop || true
           git add data/coup_blanc.txt
@@ -81,7 +81,7 @@ jobs:
         run: |
           git config user.name "github-actions"
           git config user.email "actions@github.com"
-          git stash || true
+          git stash --include-untracked || true
           git pull --rebase origin main || true
           git stash pop || true
           git add data/position.fen data/dernier_coup.json data/move_history.json || true
@@ -98,7 +98,7 @@ jobs:
         run: |
           git config user.name "github-actions"
           git config user.email "actions@github.com"
-          git stash || true
+          git stash --include-untracked || true
           git pull --rebase origin main || true
           git stash pop || true
           git add data/thumbnail_black.svg
