@@ -100,8 +100,8 @@ jobs:
           # Appliquer le coup sur le plateau
           board.push(move)
 
-          # Envoyer le coup à Lichess
-          url = f"https://lichess.org/api/board/game/{game_id}/move/{move.uci()}"
+          # Envoyer le coup à Lichess (Bot API)
+          url = f"https://lichess.org/api/bot/game/{game_id}/move/{move.uci()}"
           headers = {"Authorization": f"Bearer {token}"}
           r = requests.post(url, headers=headers)
           print(f"📤 POST {url} -> {r.status_code} {r.text}")
