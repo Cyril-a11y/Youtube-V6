@@ -35,14 +35,21 @@ jobs:
           BOT_ELO: ${{ github.event.inputs.elo }}
         run: |
           echo "♟️ Game ID: $GAME_ID"
-          
-          # 1) Récupérer la FEN actuelle
-          FEN=$(curl -s -H "Authorization: Bearer $LICHESS_BOT_TOKEN" \
-            "https://lichess.org/game/export/$GAME_ID?fen=1&moves=0" \
-            | jq -r '.fen')
-          
+
+          # 1) Récupérer la FEN actuelle avec vérification JSON
+          RESPONSE=$(curl -s -H "Authorization: Bearer $LICHESS_BOT_TOKEN" \
+            "https://lichess.org/game/export/$GAME_ID?fen=1&moves=1&pgn=0")
+
+          if ! echo "$RESPONSE" | jq . >/dev/null 2>&1; then
+            echo "❌ La réponse Lichess n'est pas du JSON valide:"
+            echo "$RESPONSE"
+            exit 1
+          fi
+
+          FEN=$(echo "$RESPONSE" | jq -r '.fen')
           if [ -z "$FEN" ] || [ "$FEN" = "null" ]; then
             echo "❌ Impossible de récupérer la FEN."
+            echo "$RESPONSE"
             exit 1
           fi
           echo "📌 FEN actuelle: $FEN"
