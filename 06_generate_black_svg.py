@@ -1,6 +1,7 @@
 import os
 import json
 import chess
+import chess.pgn  # ✅ Import obligatoire pour lire un PGN
 import chess.svg
 import requests
 from pathlib import Path
@@ -59,7 +60,6 @@ if LAST_MOVE_FILE.exists():
 
 # --- Formatage de l'historique ---
 def format_history(moves):
-    """Retourne l'historique formaté avec un saut de ligne tous les 4 demi-coups."""
     lines = []
     for i in range(0, len(moves), 4):
         lines.append(" ".join(moves[i:i+4]))
@@ -81,7 +81,7 @@ svg = chess.svg.board(
     borders=False
 )
 
-# --- Ajout de l'historique en overlay ---
+# --- Ajout de l'historique ---
 history_box = (
     f"<rect x='10' y='{720 - 110}' width='700' height='100' rx='15' ry='15' fill='white' fill-opacity='0.8'/>"
     f"<text x='20' y='{720 - 80}' font-size='20' font-family='Arial' fill='black'>{formatted_history_svg}</text>"
