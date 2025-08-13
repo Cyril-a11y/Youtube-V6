@@ -4,7 +4,6 @@ import json
 import re
 import unicodedata
 import chess
-import io
 import sys
 from collections import Counter
 from datetime import datetime, timezone
@@ -191,18 +190,15 @@ def sauvegarder_coup_blanc(coup_uci: str | None):
 
 def fetch_current_board_from_lichess(game_id):
     """
-    Récupère l'état exact de la partie depuis Lichess en JSON
-    pour éviter les problèmes de PGN pas à jour.
+    Utilise l'API stream pour avoir l'état exact et à jour de la partie.
     """
-    import time
-    timestamp = int(time.time())
-    url = f"https://lichess.org/api/game/{game_id}?moves=1&clocks=0&evals=0&opening=0&t={timestamp}"
+    url = f"https://lichess.org/api/bot/game/stream/{game_id}"
     headers = {
         "Authorization": f"Bearer {LICHESS_HUMAN_TOKEN}",
-        "Accept": "application/json"
+        "Accept": "application/x-ndjson"
     }
     try:
-        r = requests.get(url, headers=headers, timeout=30)
+        r = requests.get(url, headers=headers, stream=True, timeout=30)
     except Exception as e:
         log(f"Erreur réseau Lichess : {e}", "err")
         return None
@@ -211,20 +207,24 @@ def fetch_current_board_from_lichess(game_id):
         log(f"Erreur API Lichess : {r.status_code} {r.text[:200]}", "err")
         return None
 
-    try:
-        data = r.json()
-    except Exception as e:
-        log(f"Impossible de décoder le JSON Lichess : {e}", "err")
-        return None
+    moves_list = []
+    for line in r.iter_lines():
+        if not line:
+            continue
+        try:
+            event = json.loads(line.decode("utf-8"))
+        except Exception:
+            continue
+        if "state" in event:
+            moves_str = event["state"].get("moves", "")
+        elif "moves" in event:
+            moves_str = event.get("moves", "")
+        else:
+            continue
+        if moves_str:
+            moves_list = moves_str.strip().split()
+            break  # On s'arrête dès qu'on a les coups
 
-    moves_str = data.get("moves", "")
-    if not moves_str.strip():
-        log("Aucun coup trouvé dans la partie", "warn")
-        board = chess.Board()
-        log(f"Plateau initial, trait: {'blancs' if board.turn == chess.WHITE else 'noirs'}", "ok")
-        return board
-
-    moves_list = moves_str.strip().split()
     board = chess.Board()
     for move_uci in moves_list:
         try:
@@ -238,7 +238,7 @@ def fetch_current_board_from_lichess(game_id):
             log(f"⚠️ Erreur lors du push du coup '{move_uci}': {e}", "warn")
             break
 
-    log(f"Plateau reconstruit depuis la liste complète des coups, trait: {'blancs' if board.turn == chess.WHITE else 'noirs'}", "ok")
+    log(f"Plateau reconstruit depuis l'API stream, trait: {'blancs' if board.turn == chess.WHITE else 'noirs'}", "ok")
     return board
 
 # -----------------------
