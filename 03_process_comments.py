@@ -173,8 +173,8 @@ def sauvegarder_coup_blanc(coup_uci: str | None):
         log("Aucun coup à sauvegarder, fichier non modifié.", "warn")
 
 def fetch_current_board_from_lichess(game_id):
-    """Version rapide via /game/export."""
-    url = f"https://lichess.org/game/export/{game_id}?moves=1&fen=1"
+    """Version rapide via /game/export avec sortie JSON."""
+    url = f"https://lichess.org/game/export/{game_id}?moves=1&fen=1&as=json"
     headers = {"Authorization": f"Bearer {LICHESS_BOT_TOKEN}"}
     try:
         r = requests.get(url, headers=headers, timeout=10)
@@ -186,12 +186,12 @@ def fetch_current_board_from_lichess(game_id):
         return None
     try:
         data = r.json()
-    except:
-        log("Réponse Lichess non JSON", "err")
+    except Exception as e:
+        log(f"Impossible de parser JSON Lichess : {e}", "err")
         return None
     fen = data.get("fen")
     if not fen:
-        log("Pas de FEN dans la réponse Lichess", "err")
+        log(f"Pas de FEN dans la réponse Lichess : {data}", "err")
         return None
     return chess.Board(fen)
 
