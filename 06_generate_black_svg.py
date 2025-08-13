@@ -1,7 +1,8 @@
 import os
 import json
+import time
 import chess
-import chess.pgn  # ✅ Import obligatoire pour lire un PGN
+import chess.pgn
 import chess.svg
 import requests
 from pathlib import Path
@@ -17,25 +18,39 @@ if not GAME_ID_FILE.exists():
     exit(0)
 game_id = GAME_ID_FILE.read_text(encoding="utf-8").strip()
 
-# --- Téléchargement du PGN si absent ---
-if not PGN_FILE.exists():
-    print("📥 Téléchargement du PGN depuis Lichess…")
-    token = os.getenv("LICHESS_BOT_TOKEN") or os.getenv("LICHESS_HUMAN_TOKEN")
-    if not token:
-        print("❌ Aucun token Lichess trouvé dans les variables d'environnement.")
-        exit(0)
+# --- Télécharger toujours le PGN depuis Lichess ---
+print("📥 Téléchargement du PGN depuis Lichess…")
+token = os.getenv("LICHESS_BOT_TOKEN") or os.getenv("LICHESS_HUMAN_TOKEN")
+if not token:
+    print("❌ Aucun token Lichess trouvé dans les variables d'environnement.")
+    exit(0)
 
-    url = f"https://lichess.org/game/export/{game_id}?pgn=1&clocks=0&evals=0&literate=0"
-    headers = {"Authorization": f"Bearer {token}"}
+url = f"https://lichess.org/game/export/{game_id}?pgn=1&clocks=0&evals=0&literate=0"
+headers = {"Authorization": f"Bearer {token}"}
+
+# On réessaie jusqu'à ce que le dernier coup apparaisse (max 5 tentatives)
+for attempt in range(5):
     r = requests.get(url, headers=headers)
     if r.status_code != 200:
         print(f"❌ Erreur Lichess: {r.status_code} {r.text}")
         exit(0)
 
-    PGN_FILE.write_text(r.text, encoding="utf-8")
-    print(f"✅ PGN sauvegardé dans {PGN_FILE}")
+    pgn_text = r.text
+    if PGN_FILE.exists():
+        old_pgn = PGN_FILE.read_text(encoding="utf-8")
+    else:
+        old_pgn = ""
 
-# --- Reconstruction du plateau depuis le PGN ---
+    # Si le PGN a changé ou qu'on est à la dernière tentative, on l'enregistre
+    if pgn_text != old_pgn or attempt == 4:
+        PGN_FILE.write_text(pgn_text, encoding="utf-8")
+        print(f"✅ PGN sauvegardé dans {PGN_FILE}")
+        break
+
+    print("⏳ Dernier coup pas encore présent, nouvelle tentative dans 1s...")
+    time.sleep(1)
+
+# --- Reconstruction du plateau ---
 with open(PGN_FILE, "r", encoding="utf-8") as f:
     game = chess.pgn.read_game(f)
 if not game:
@@ -84,10 +99,4 @@ svg = chess.svg.board(
 # --- Ajout de l'historique ---
 history_box = (
     f"<rect x='10' y='{720 - 110}' width='700' height='100' rx='15' ry='15' fill='white' fill-opacity='0.8'/>"
-    f"<text x='20' y='{720 - 80}' font-size='20' font-family='Arial' fill='black'>{formatted_history_svg}</text>"
-)
-svg_with_history = svg.replace("</svg>", history_box + "\n</svg>")
-
-# --- Sauvegarde ---
-SVG_FILE.write_text(svg_with_history, encoding="utf-8")
-print(f"✅ SVG généré : {SVG_FILE}")
+    f"<text x='20' y='{720 - 80}' font-size='2
