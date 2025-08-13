@@ -14,14 +14,15 @@ from pathlib import Path
 # -----------------------
 YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY")
 YOUTUBE_VIDEO_ID = os.getenv("YOUTUBE_VIDEO_ID")
-LICHESS_BOT_TOKEN = os.getenv("LICHESS_BOT_TOKEN")  # <-- uniquement le bot
+LICHESS_HUMAN_TOKEN = os.getenv("LICHESS_HUMAN_TOKEN")  # joue les blancs
+LICHESS_BOT_TOKEN = os.getenv("LICHESS_BOT_TOKEN")      # joue les noirs
 LAST_MOVE_FILE = "data/dernier_coup.json"
 GAME_ID_FILE = "data/game_id.txt"
 COUP_BLANCS_FILE = Path("data/coup_blanc.txt")
 
 # Vérification des secrets
 missing = []
-for var in ["YOUTUBE_API_KEY", "YOUTUBE_VIDEO_ID", "LICHESS_BOT_TOKEN"]:
+for var in ["YOUTUBE_API_KEY", "YOUTUBE_VIDEO_ID", "LICHESS_HUMAN_TOKEN", "LICHESS_BOT_TOKEN"]:
     if not globals()[var]:
         missing.append(var)
 if missing:
@@ -183,9 +184,9 @@ def sauvegarder_coup_blanc(coup_uci: str | None):
         log("Aucun coup à sauvegarder, fichier non modifié.", "warn")
 
 def fetch_current_board_from_lichess(game_id):
-    url = f"https://lichess.org/api/bot/game/stream/{game_id}"
+    url = f"https://lichess.org/api/board/game/stream/{game_id}"
     headers = {
-        "Authorization": f"Bearer {LICHESS_BOT_TOKEN}",
+        "Authorization": f"Bearer {LICHESS_HUMAN_TOKEN}",
         "Accept": "application/x-ndjson"
     }
     try:
@@ -213,18 +214,18 @@ def fetch_current_board_from_lichess(game_id):
     if last_moves:
         for m in last_moves:
             board.push_uci(m)
-    log(f"Plateau reconstruit depuis flux bot, trait: {'blancs' if board.turn == chess.WHITE else 'noirs'}", "ok")
+    log(f"Plateau reconstruit depuis flux board, trait: {'blancs' if board.turn == chess.WHITE else 'noirs'}", "ok")
     return board
 
-def jouer_coup_bot(game_id, coup_uci):
-    """Joue un coup avec le bot."""
-    url = f"https://lichess.org/api/bot/game/{game_id}/move/{coup_uci}"
-    headers = {"Authorization": f"Bearer {LICHESS_BOT_TOKEN}"}
+def jouer_coup_blanc(game_id, coup_uci):
+    """Joue un coup avec le compte humain."""
+    url = f"https://lichess.org/api/board/game/{game_id}/move/{coup_uci}"
+    headers = {"Authorization": f"Bearer {LICHESS_HUMAN_TOKEN}"}
     r = requests.post(url, headers=headers)
     if r.status_code != 200:
-        log(f"Erreur API Lichess (jouer coup): {r.status_code} {r.text}", "err")
+        log(f"Erreur API Lichess (jouer coup blanc): {r.status_code} {r.text}", "err")
         return False
-    log(f"Coup {coup_uci} joué avec succès", "ok")
+    log(f"Coup blanc {coup_uci} joué avec succès", "ok")
     return True
 
 # -----------------------
@@ -254,7 +255,7 @@ if __name__ == "__main__":
         sauvegarder_coup_blanc(coup_choisi_uci)
 
         if coup_choisi_uci:
-            jouer_coup_bot(game_id, coup_choisi_uci)
+            jouer_coup_blanc(game_id, coup_choisi_uci)
 
         print("=== FIN DU SCRIPT ===")
 
