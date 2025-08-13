@@ -1,4 +1,4 @@
-name: Run Lichess Bot (Direct Black Move via API)
+name: Run Lichess Bot (Direct Black Move from PGN)
 
 on:
   workflow_dispatch:
@@ -24,48 +24,51 @@ jobs:
       - name: Install Stockfish & Python deps
         run: |
           sudo apt-get update
-          sudo apt-get install -y stockfish python3-pip jq
+          sudo apt-get install -y stockfish python3-pip
           python3 -m pip install --upgrade pip
           python3 -m pip install python-chess requests
 
-      - name: Play best black move directly
+      - name: Play best black move from PGN
         env:
           LICHESS_BOT_TOKEN: ${{ secrets.LICHESS_BOT_TOKEN }}
           GAME_ID: ${{ github.event.inputs.game_id }}
           BOT_ELO: ${{ github.event.inputs.elo }}
-          FEN: ${{ steps.get_fen.outputs.fen }}
         run: |
           echo "♟️ Game ID: $GAME_ID"
+          mkdir -p data
 
-          # 1) Récupérer la FEN actuelle depuis l’API Lichess
+          # 1) Récupérer le PGN brut depuis Lichess
           RESPONSE=$(curl -s -H "Authorization: Bearer $LICHESS_BOT_TOKEN" \
-            "https://lichess.org/game/export/$GAME_ID?fen=1&moves=0&pgn=0")
+            "https://lichess.org/game/export/$GAME_ID?pgn=1&clocks=0&evals=0&literate=0")
 
-          if ! echo "$RESPONSE" | jq . >/dev/null 2>&1; then
-            echo "❌ La réponse Lichess n'est pas du JSON valide :"
-            echo "$RESPONSE"
+          if [ -z "$RESPONSE" ]; then
+            echo "❌ Impossible de récupérer le PGN."
             exit 1
           fi
 
-          FEN=$(echo "$RESPONSE" | jq -r '.fen')
-          if [ -z "$FEN" ] || [ "$FEN" = "null" ]; then
-            echo "❌ Impossible de récupérer la FEN."
-            echo "$RESPONSE"
-            exit 1
-          fi
-          echo "📌 FEN actuelle: $FEN"
-          export FEN
+          echo "$RESPONSE" > data/game.pgn
+          echo "✅ PGN sauvegardé dans data/game.pgn"
 
-          # 2) Script Python pour calculer et jouer le coup noir
+          # 2) Script Python : afficher les coups + jouer le coup noir
           cat > play_move.py <<'PY'
-          import os, chess, chess.engine, requests
+          import os, chess.pgn, chess.engine, requests
 
-          fen = os.environ["FEN"]
           game_id = os.environ["GAME_ID"]
           elo = int(os.environ.get("BOT_ELO", 1500))
           token = os.environ["LICHESS_BOT_TOKEN"]
 
-          board = chess.Board(fen)
+          with open("data/game.pgn", "r", encoding="utf-8") as f:
+              game = chess.pgn.read_game(f)
+
+          board = game.board()
+          moves_list = []
+          for move in game.mainline_moves():
+              san = board.san(move)
+              moves_list.append(san)
+              board.push(move)
+
+          print("📜 Historique des coups :", " ".join(moves_list))
+
           if board.turn != chess.BLACK:
               print("❌ Ce n'est pas aux Noirs de jouer.")
               exit(0)
@@ -78,12 +81,10 @@ jobs:
 
           print(f"🤖 Coup choisi: {move.uci()}")
 
-          # Envoyer le coup à Lichess
           url = f"https://lichess.org/api/board/game/{game_id}/move/{move.uci()}"
           headers = {"Authorization": f"Bearer {token}"}
           r = requests.post(url, headers=headers)
           print(f"📤 POST {url} -> {r.status_code} {r.text}")
           PY
 
-          # 3) Exécuter le script Python
           python3 play_move.py
