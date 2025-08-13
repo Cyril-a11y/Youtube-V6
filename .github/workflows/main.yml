@@ -65,8 +65,8 @@ jobs:
         run: python 04_play_white.py
         continue-on-error: true
 
-      # 9) Short delay to allow Lichess sync
-      - name: Short sync delay
+      # 9) Delay to ensure Lichess sync after white move
+      - name: Delay after white move
         run: sleep 3
 
       # 10) Play black move
@@ -74,7 +74,11 @@ jobs:
         run: python 05_play_black.py
         continue-on-error: true
 
-      # 11) Commit updated game data
+      # 11) Delay to ensure Lichess sync after black move
+      - name: Delay after black move
+        run: sleep 5
+
+      # 12) Commit updated game data
       - name: Commit updated game data
         run: |
           git config user.name "github-actions"
@@ -84,12 +88,12 @@ jobs:
           git diff --cached --quiet || git commit -m "Update game state after moves [skip ci]"
           git push --force-with-lease origin main || true
 
-      # 12) Generate black SVG
+      # 13) Generate black SVG (forces PGN refresh inside script)
       - name: Generate black SVG
         run: python 06_generate_black_svg.py
         continue-on-error: true
 
-      # 13) Commit SVG thumbnail
+      # 14) Commit SVG thumbnail
       - name: Commit SVG thumbnail
         run: |
           git config user.name "github-actions"
