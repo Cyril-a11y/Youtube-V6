@@ -1,4 +1,4 @@
-# 04_play_white.py
+# 04_play_white.py — version fiable avec PGN
 import os
 import requests
 import json
@@ -10,20 +10,18 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 # -----------------------
-# Chargement des secrets via GitHub Actions
+# Config et fichiers
 # -----------------------
 LICHESS_HUMAN_TOKEN = os.getenv("LICHESS_HUMAN_TOKEN")
-GAME_ID_FILE = "data/game_id.txt"
-LAST_MOVE_FILE = "data/dernier_coup.json"
-FEN_FILE = "data/position.fen"
-
+GAME_ID_FILE = Path("data/game_id.txt")
+LAST_MOVE_FILE = Path("data/dernier_coup.json")
+FEN_FILE = Path("data/position.fen")
 COUP_BLANCS_FILE = Path("data/coup_blanc.txt")
 POSITION_BEFORE_FILE = Path("data/position_before_white.json")
 MOVE_HISTORY_FILE = Path("data/move_history.json")
 
-# Vérification des secrets
 if not LICHESS_HUMAN_TOKEN:
-    raise SystemExit("❌ LICHESS_HUMAN_TOKEN manquant. Définis-le dans les secrets GitHub Actions.")
+    raise SystemExit("❌ LICHESS_HUMAN_TOKEN manquant.")
 
 # -----------------------
 # Utilitaires
@@ -33,19 +31,12 @@ def log(msg, type="info"):
     print(f"{icons.get(type, '•')} {msg}")
 
 def load_game_id():
-    try:
-        path = Path(GAME_ID_FILE).resolve()
-        if not path.exists():
-            log(f"{path} introuvable. Lance 01_create_game.py d'abord.", "err")
-            return None
-        mtime = datetime.fromtimestamp(path.stat().st_mtime, tz=timezone.utc)
-        log(f"Lecture de {path} (modifié le {mtime.isoformat()})", "info")
-        gid = path.read_text(encoding="utf-8").strip()
-        log(f"Game ID chargé : {gid}", "ok")
-        return gid
-    except Exception as e:
-        log(f"Impossible de lire le Game ID : {e}", "err")
+    if not GAME_ID_FILE.exists():
+        log("game_id.txt introuvable", "err")
         return None
+    gid = GAME_ID_FILE.read_text(encoding="utf-8").strip()
+    log(f"Game ID chargé : {gid}", "ok")
+    return gid
 
 def load_white_move():
     if not COUP_BLANCS_FILE.exists():
@@ -53,36 +44,14 @@ def load_white_move():
         return None
     return COUP_BLANCS_FILE.read_text(encoding="utf-8").strip()
 
-def fetch_current_state(game_id):
-    url = f"https://lichess.org/game/export/{game_id}?moves=1&tags=1&pgnInJson=1&clocks=0&fen=1"
-    headers = {"Authorization": f"Bearer {LICHESS_HUMAN_TOKEN}", "Accept": "application/json"}
-    try:
-        r = requests.get(url, headers=headers, timeout=30)
-        if r.status_code != 200:
-            log(f"Erreur API Lichess : {r.status_code} {r.text[:200]}", "err")
-            return None, None
-        data = r.json()
-    except Exception as e:
-        log(f"Erreur lecture JSON Lichess : {e}", "err")
-        return None, None
-
-    if data.get("fen"):
-        fen = data["fen"]
-        moves = data.get("moves", "").split()
-        return fen, (moves[-1] if moves else None)
-
-    # Fallback PGN
-    pgn_str = data.get("pgn")
-    if not pgn_str:
-        return None, None
-
-    game = chess.pgn.read_game(io.StringIO(pgn_str))
-    board = game.board()
-    last_move = None
-    for move in game.mainline_moves():
-        last_move = move.uci()
-        board.push(move)
-    return board.fen(), last_move
+def download_pgn(game_id):
+    url = f"https://lichess.org/game/export/{game_id}?pgn=1&clocks=0&evals=0&literate=0"
+    headers = {"Authorization": f"Bearer {LICHESS_HUMAN_TOKEN}"}
+    r = requests.get(url, headers=headers, timeout=30)
+    if r.status_code != 200:
+        log(f"Erreur API Lichess : {r.status_code} {r.text[:200]}", "err")
+        return None
+    return r.text
 
 def save_position_before_move(fen):
     payload = {"fen": fen, "horodatage": datetime.now(timezone.utc).isoformat()}
@@ -90,13 +59,13 @@ def save_position_before_move(fen):
     log(f"Position avant coup sauvegardée dans {POSITION_BEFORE_FILE}", "save")
 
 def update_position_files(fen, last_move):
-    Path(FEN_FILE).write_text(fen or "", encoding="utf-8")
+    FEN_FILE.write_text(fen or "", encoding="utf-8")
     payload = {
         "dernier_coup": last_move,
         "fen": fen,
         "horodatage": datetime.now(timezone.utc).isoformat(),
     }
-    Path(LAST_MOVE_FILE).write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    LAST_MOVE_FILE.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
     log("position.fen et dernier_coup.json mis à jour", "ok")
 
 def append_move_to_history(couleur, coup, fen):
@@ -119,8 +88,6 @@ def append_move_to_history(couleur, coup, fen):
 
 def to_uci(board, move_str):
     move_str = move_str.strip()
-    if len(move_str) == 2 and move_str[0].isalpha() and move_str[1].isdigit():
-        move_str = move_str[0].lower() + move_str[1]
     try:
         mv = board.parse_san(move_str)
         if mv in board.legal_moves:
@@ -133,14 +100,6 @@ def to_uci(board, move_str):
             return mv.uci()
     except Exception:
         pass
-    if len(move_str) == 2 and move_str[0] in "abcdefgh" and move_str[1] in "12345678":
-        try:
-            to_sq = chess.parse_square(move_str.lower())
-            candidates = [m for m in board.legal_moves if m.to_square == to_sq]
-            if len(candidates) == 1:
-                return candidates[0].uci()
-        except Exception:
-            pass
     return None
 
 def play_move(game_id, move_uci):
@@ -159,12 +118,24 @@ if __name__ == "__main__":
     if not game_id:
         raise SystemExit(1)
 
-    fen, last_move = fetch_current_state(game_id)
-    if not fen:
+    # 🔹 Télécharger et parser le PGN pour savoir si c'est aux blancs
+    pgn_str = download_pgn(game_id)
+    if not pgn_str:
         raise SystemExit(1)
-    save_position_before_move(fen)
 
-    board = chess.Board(fen)
+    game = chess.pgn.read_game(io.StringIO(pgn_str))
+    if not game:
+        log("Impossible de parser le PGN.", "err")
+        raise SystemExit(1)
+
+    board = game.board()
+    last_move = None
+    for move in game.mainline_moves():
+        last_move = move.uci()
+        board.push(move)
+
+    save_position_before_move(board.fen())
+
     if board.turn != chess.WHITE:
         log("Ce n'est pas aux Blancs de jouer.", "warn")
         raise SystemExit(0)
@@ -182,11 +153,18 @@ if __name__ == "__main__":
     san_str = board.san(chess.Move.from_uci(move_uci))
     if not play_move(game_id, move_uci):
         raise SystemExit(1)
+
     log(f"Coup joué : {move_uci} ({san_str})", "ok")
 
-    # 🕒 Attendre que Lichess mette à jour la FEN
+    # 🕒 Re-télécharger après le coup
     time.sleep(2)
-    fen_after, last_move_after = fetch_current_state(game_id)
-    if fen_after:
-        update_position_files(fen_after, last_move_after)
-        append_move_to_history("blanc", last_move_after, fen_after)
+    pgn_after = download_pgn(game_id)
+    if pgn_after:
+        game_after = chess.pgn.read_game(io.StringIO(pgn_after))
+        board_after = game_after.board()
+        last_move_after = None
+        for move in game_after.mainline_moves():
+            last_move_after = move.uci()
+            board_after.push(move)
+        update_position_files(board_after.fen(), last_move_after)
+        append_move_to_history("blanc", last_move_after, board_after.fen())
