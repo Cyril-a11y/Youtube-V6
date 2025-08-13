@@ -18,13 +18,13 @@ def generate_black_svg():
     fen = Path(FEN_FILE).read_text(encoding="utf-8").strip()
     board = chess.Board(fen)
 
-    # Récupérer le dernier coup joué (UCI)
+    # Récupérer le dernier coup joué (UCI ou ancien format)
     last_move = None
     if Path(LAST_MOVE_FILE).exists():
         try:
             with open(LAST_MOVE_FILE, "r", encoding="utf-8") as f:
                 data = json.load(f)
-            last_move = data.get("dernier_coup")
+            last_move = data.get("dernier_coup_uci") or data.get("dernier_coup")
         except Exception as e:
             print(f"⚠️ Impossible de lire {LAST_MOVE_FILE}: {e}")
 
@@ -34,7 +34,6 @@ def generate_black_svg():
         try:
             with open(MOVE_HISTORY_FILE, "r", encoding="utf-8") as f:
                 history = json.load(f)
-            # On ne garde que le SAN ou UCI selon le format stocké
             for entry in history:
                 moves_list.append(entry.get("coup", ""))
         except Exception as e:
@@ -52,7 +51,7 @@ def generate_black_svg():
         borders=False
     )
 
-    # Ajouter l'historique des coups en overlay avec fond semi-transparent
+    # Ajouter l'historique en overlay avec fond semi-transparent
     history_box = f'''
     <rect x="10" y="{720 - 110}" width="700" height="100" rx="15" ry="15" fill="white" fill-opacity="0.8"/>
     <text x="20" y="{720 - 80}" font-size="20" font-family="Arial" fill="black">
@@ -60,7 +59,6 @@ def generate_black_svg():
     </text>
     '''
 
-    # Insérer le bloc texte dans le SVG (avant la balise </svg>)
     svg_with_history = svg.replace("</svg>", history_box + "\n</svg>")
 
     # Sauvegarder
