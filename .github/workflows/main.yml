@@ -94,17 +94,17 @@ jobs:
           git diff --cached --quiet || git commit -m "Update game state after moves [skip ci]"
           git push --force-with-lease origin main || true
 
-      # 14) Generate black SVG (forces PGN refresh inside script)
-      - name: Generate black SVG
+      # 14) Generate black SVG + PNG
+      - name: Generate black SVG & PNG
         run: python 06_generate_black_svg.py
         continue-on-error: true
 
-      # 15) Commit SVG thumbnail
-      - name: Commit SVG thumbnail
+      # 15) Commit SVG & PNG thumbnail
+      - name: Commit SVG & PNG thumbnail
         run: |
           git config user.name "github-actions"
           git config user.email "actions@github.com"
           git pull --rebase origin main || true
-          git add data/thumbnail_black.svg || true
+          git add data/thumbnail_black.svg data/thumbnail_black.png || true
           git diff --cached --quiet || git commit -m "Update black thumbnail [skip ci]"
           git push --force-with-lease origin main || true
