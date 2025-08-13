@@ -36,14 +36,14 @@ jobs:
       - name: Ensure data folder exists
         run: mkdir -p data
 
-      # 5) Secrets → env (incl. GH_WORKFLOW_TOKEN pour 05_play_black.py)
+      # 5) Secrets → env
       - name: Load secrets into environment
         run: |
           echo "YOUTUBE_API_KEY=${{ secrets.YOUTUBE_API_KEY }}" >> $GITHUB_ENV
           echo "YOUTUBE_VIDEO_ID=${{ secrets.YOUTUBE_VIDEO_ID }}" >> $GITHUB_ENV
           echo "LICHESS_HUMAN_TOKEN=${{ secrets.LICHESS_HUMAN_TOKEN }}" >> $GITHUB_ENV
           echo "LICHESS_BOT_TOKEN=${{ secrets.LICHESS_BOT_TOKEN }}" >> $GITHUB_ENV
-          echo "GH_WORKFLOW_TOKEN=${{ secrets.GH_WORKFLOW_TOKEN }}" >> $GITHUB_ENV  # ✅ token attendu par 05_play_black.py
+          echo "GH_WORKFLOW_TOKEN=${{ secrets.GH_WORKFLOW_TOKEN }}" >> $GITHUB_ENV
 
       # 6) Comments → select white move
       - name: Process comments and select white move
@@ -69,12 +69,12 @@ jobs:
       - name: Short sync delay
         run: sleep 3
 
-      # 9) Play black move (script dispatch run_bot.yml via GH_WORKFLOW_TOKEN)
+      # 9) Play black move (dispatch run_bot.yml via GH_WORKFLOW_TOKEN)
       - name: Play black move
         run: python 05_play_black.py
         continue-on-error: true
 
-      # 10) Commit updated data (only if changed)
+      # 10) Commit updated game data (only if changed)
       - name: Commit updated game data
         run: |
           git config user.name "github-actions"
@@ -82,4 +82,19 @@ jobs:
           git pull --rebase origin main || true
           git add data/position.fen data/dernier_coup.json data/move_history.json || true
           git diff --cached --quiet || git commit -m "Update game state after moves [skip ci]"
+          git push --force-with-lease origin main
+
+      # 11) Generate black SVG from latest position
+      - name: Generate black SVG
+        run: python generate_black_svg.py
+        continue-on-error: true
+
+      # 12) Commit generated SVG (only if changed)
+      - name: Commit SVG thumbnail
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git pull --rebase origin main || true
+          git add data/thumbnail_black.svg
+          git diff --cached --quiet || git commit -m "Update black thumbnail [skip ci]"
           git push --force-with-lease origin main
