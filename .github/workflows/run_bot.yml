@@ -36,9 +36,9 @@ jobs:
         run: |
           echo "♟️ Game ID: $GAME_ID"
 
-          # 1) Récupérer la FEN actuelle depuis l’API Lichess (JSON vérifié)
+          # 1) Récupérer la FEN actuelle depuis l’API Lichess
           RESPONSE=$(curl -s -H "Authorization: Bearer $LICHESS_BOT_TOKEN" \
-            "https://lichess.org/game/export/$GAME_ID?fen=1&moves=1&pgn=0")
+            "https://lichess.org/game/export/$GAME_ID?fen=1&moves=0&pgn=0")
 
           if ! echo "$RESPONSE" | jq . >/dev/null 2>&1; then
             echo "❌ La réponse Lichess n'est pas du JSON valide :"
@@ -66,7 +66,7 @@ token = os.environ["LICHESS_BOT_TOKEN"]
 board = chess.Board(fen)
 if board.turn != chess.BLACK:
     print("❌ Ce n'est pas aux Noirs de jouer.")
-    exit(0)
+    exit(0) # Sortir proprement
 
 engine = chess.engine.SimpleEngine.popen_uci("/usr/bin/stockfish")
 engine.configure({"UCI_LimitStrength": True, "UCI_Elo": elo})
@@ -78,7 +78,8 @@ print(f"🤖 Coup choisi: {move.uci()}")
 
 # Envoyer le coup à Lichess
 url = f"https://lichess.org/api/board/game/{game_id}/move/{move.uci()}"
-r = requests.post(url, headers={"Authorization": f"Bearer {token}"})
+headers = {"Authorization": f"Bearer {token}"}
+r = requests.post(url, headers=headers)
 print(f"📤 POST {url} -> {r.status_code} {r.text}")
 PY
 
