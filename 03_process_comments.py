@@ -14,7 +14,6 @@ from pathlib import Path
 # -----------------------
 YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY")
 YOUTUBE_VIDEO_ID = os.getenv("YOUTUBE_VIDEO_ID")
-LICHESS_HUMAN_TOKEN = os.getenv("LICHESS_HUMAN_TOKEN")
 LICHESS_BOT_TOKEN = os.getenv("LICHESS_BOT_TOKEN")
 LAST_MOVE_FILE = "data/dernier_coup.json"
 GAME_ID_FILE = "data/game_id.txt"
@@ -64,7 +63,8 @@ def charger_horodatage_dernier_coup():
         Path(LAST_MOVE_FILE).write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
         return datetime(1970, 1, 1, tzinfo=timezone.utc)
 
-def recuperer_commentaires(video_id, max_results=100, apres=None):
+def recuperer_commentaires(video_id, apres=None, max_results=100):
+    """Récupère les commentaires YouTube, s'arrête dès qu'on tombe sur un plus ancien que 'apres'."""
     commentaires = []
     url = "https://www.googleapis.com/youtube/v3/commentThreads"
     params = {
@@ -74,10 +74,9 @@ def recuperer_commentaires(video_id, max_results=100, apres=None):
         "order": "time",
         "key": YOUTUBE_API_KEY
     }
-    nb = 0
     while True:
         try:
-            r = requests.get(url, params=params, timeout=30)
+            r = requests.get(url, params=params, timeout=10)
         except Exception as e:
             log(f"Erreur réseau API YouTube : {e}", "err")
             break
@@ -85,19 +84,19 @@ def recuperer_commentaires(video_id, max_results=100, apres=None):
             log(f"Erreur API YouTube : {r.status_code} {r.text[:200]}", "err")
             break
         data = r.json()
+        stop = False
         for item in data.get("items", []):
             snippet = item["snippet"]["topLevelComment"]["snippet"]
             texte = snippet["textDisplay"]
             date_pub = datetime.fromisoformat(snippet["publishedAt"].replace("Z", "+00:00"))
             if apres and date_pub <= apres:
-                continue
+                stop = True
+                break
             commentaires.append(texte)
-            nb += 1
-        log(f"Page récupérée, total commentaires valides : {nb}", "find")
-        if "nextPageToken" in data:
-            params["pageToken"] = data["nextPageToken"]
-        else:
+        log(f"Page récupérée, total commentaires valides : {len(commentaires)}", "find")
+        if stop or "nextPageToken" not in data:
             break
+        params["pageToken"] = data["nextPageToken"]
     log(f"{len(commentaires)} commentaire(s) récupéré(s) au total", "ok")
     return commentaires
 
@@ -152,27 +151,17 @@ def extraire_coups_valides(board: chess.Board, commentaires):
     valides_uci = []
     for com in commentaires:
         token = nettoyer_et_corriger_san(com)
-        log(f"Commentaire brut: '{com}' → nettoyé: '{token}'", "info")
         if not token:
-            log("Ignoré: vide après nettoyage", "warn")
             continue
         move = _parse_move_any(board, token)
         if move and move in board.legal_moves:
-            san = board.san(move)
-            uci = move.uci()
-            valides_uci.append(uci)
-            log(f"Coup valide: SAN='{san}' | UCI='{uci}'", "ok")
-        else:
-            log(f"Coup illégal ou non reconnu: '{token}'", "err")
-    log(f"Liste finale coups valides (UCI): {valides_uci}", "find")
+            valides_uci.append(move.uci())
     return valides_uci
 
 def choisir_coup_majoritaire(coups_uci):
     if not coups_uci:
-        log("Aucun coup majoritaire possible (liste vide)", "err")
         return None
-    coup, nb = Counter(coups_uci).most_common(1)[0]
-    log(f"Coup majoritaire: {coup} ({nb} vote(s))", "ok")
+    coup, _ = Counter(coups_uci).most_common(1)[0]
     return coup
 
 def sauvegarder_coup_blanc(coup_uci: str | None):
@@ -184,48 +173,34 @@ def sauvegarder_coup_blanc(coup_uci: str | None):
         log("Aucun coup à sauvegarder, fichier non modifié.", "warn")
 
 def fetch_current_board_from_lichess(game_id):
-    """
-    Utilise le flux bot pour récupérer la position exacte à jour.
-    """
-    url = f"https://lichess.org/api/bot/game/stream/{game_id}"
-    headers = {
-        "Authorization": f"Bearer {LICHESS_BOT_TOKEN}",
-        "Accept": "application/x-ndjson"
-    }
+    """Version rapide via /game/export."""
+    url = f"https://lichess.org/game/export/{game_id}?moves=1&fen=1"
+    headers = {"Authorization": f"Bearer {LICHESS_BOT_TOKEN}"}
     try:
-        r = requests.get(url, headers=headers, stream=True, timeout=30)
+        r = requests.get(url, headers=headers, timeout=10)
     except Exception as e:
         log(f"Erreur réseau Lichess : {e}", "err")
         return None
     if r.status_code != 200:
         log(f"Erreur API Lichess : {r.status_code} {r.text[:200]}", "err")
         return None
-
-    last_moves = None
-    for line in r.iter_lines():
-        if not line:
-            continue
-        try:
-            event = json.loads(line.decode("utf-8"))
-        except:
-            continue
-        if "moves" in event:
-            last_moves = event["moves"].strip().split()
-    r.close()
-
-    board = chess.Board()
-    if last_moves:
-        for m in last_moves:
-            board.push_uci(m)
-    log(f"Plateau reconstruit depuis flux bot, trait: {'blancs' if board.turn == chess.WHITE else 'noirs'}", "ok")
-    return board
+    try:
+        data = r.json()
+    except:
+        log("Réponse Lichess non JSON", "err")
+        return None
+    fen = data.get("fen")
+    if not fen:
+        log("Pas de FEN dans la réponse Lichess", "err")
+        return None
+    return chess.Board(fen)
 
 # -----------------------
 # Main
 # -----------------------
 if __name__ == "__main__":
     try:
-        print("=== DÉBUT DU SCRIPT ===")
+        log("=== DÉBUT DU SCRIPT ===", "info")
         dernier_coup_time = charger_horodatage_dernier_coup()
         commentaires = recuperer_commentaires(YOUTUBE_VIDEO_ID, apres=dernier_coup_time)
         if not commentaires:
@@ -242,7 +217,7 @@ if __name__ == "__main__":
         coups_valides_uci = extraire_coups_valides(board, commentaires)
         coup_choisi_uci = choisir_coup_majoritaire(coups_valides_uci)
         sauvegarder_coup_blanc(coup_choisi_uci)
-        print("=== FIN DU SCRIPT ===")
+        log("=== FIN DU SCRIPT ===", "info")
     except Exception as e:
         log(f"Erreur non bloquante: {e}", "err")
         try:
