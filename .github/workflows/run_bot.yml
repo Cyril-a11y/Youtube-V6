@@ -21,11 +21,13 @@ jobs:
     timeout-minutes: 5
 
     steps:
+      # 1) Récupération du dépôt
       - name: Checkout repo
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
+      # 2) Installer Stockfish + dépendances Python
       - name: Install Stockfish & Python deps
         run: |
           sudo apt-get update
@@ -33,6 +35,7 @@ jobs:
           python3 -m pip install --upgrade pip
           python3 -m pip install python-chess requests
 
+      # 3) Jouer le coup noir
       - name: Play best black move from PGN and update files
         env:
           LICHESS_BOT_TOKEN: ${{ secrets.LICHESS_BOT_TOKEN }}
@@ -143,10 +146,12 @@ jobs:
 
           python3 play_move.py
 
+      # 4) Commit & push avec rebase pour éviter les conflits
       - name: Commit updated files
         run: |
           git config user.name "github-actions"
           git config user.email "actions@github.com"
-          git add data/position.fen data/dernier_coup.json data/move_history.json
-          git commit -m "MAJ après coup noir"
-          git push
+          git pull --rebase origin main || true
+          git add data/position.fen data/dernier_coup.json data/move_history.json || true
+          git diff --cached --quiet || git commit -m "MAJ après coup noir"
+          git push --force-with-lease origin main || true
