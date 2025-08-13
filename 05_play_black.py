@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 
 # ----- Config / chemins
 REPO = "Cyril-a11y/Youtube-V6"     # <-- adapte si besoin
-BOT_WORKFLOW_FILE = ".github/workflows/run_bot.yml"  # chemin complet vers le workflow bot
+BOT_WORKFLOW_FILE = "180821453"    # ID unique du workflow run_bot.yml
 GITHUB_TOKEN = os.getenv("GH_WORKFLOW_TOKEN")  # Secret GitHub
 
 LICHESS_BOT_TOKEN = os.getenv("LICHESS_BOT_TOKEN")
@@ -99,7 +99,7 @@ def trigger_bot_workflow(game_id: str, elo: str = "1500"):
         }
     }
 
-    log(f"🚀 Dispatch workflow: {BOT_WORKFLOW_FILE} avec game_id={game_id} et elo={elo}")
+    log(f"🚀 Dispatch workflow ID={BOT_WORKFLOW_FILE} avec game_id={game_id} et elo={elo}")
     r = requests.post(url, headers=headers, json=payload, timeout=20)
 
     if r.status_code == 204:
