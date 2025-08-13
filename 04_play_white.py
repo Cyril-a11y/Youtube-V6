@@ -19,6 +19,7 @@ FEN_FILE = Path("data/position.fen")
 COUP_BLANCS_FILE = Path("data/coup_blanc.txt")
 POSITION_BEFORE_FILE = Path("data/position_before_white.json")
 MOVE_HISTORY_FILE = Path("data/move_history.json")
+PGN_FILE = Path("data/game.pgn")
 
 if not LICHESS_HUMAN_TOKEN:
     raise SystemExit("❌ LICHESS_HUMAN_TOKEN manquant.")
@@ -51,6 +52,7 @@ def download_pgn(game_id):
     if r.status_code != 200:
         log(f"Erreur API Lichess : {r.status_code} {r.text[:200]}", "err")
         return None
+    PGN_FILE.write_text(r.text, encoding="utf-8")  # 💾 Sauvegarde du PGN brut
     return r.text
 
 def save_position_before_move(fen):
@@ -88,18 +90,29 @@ def append_move_to_history(couleur, coup, fen):
 
 def to_uci(board, move_str):
     move_str = move_str.strip()
+    # Essai SAN
     try:
         mv = board.parse_san(move_str)
         if mv in board.legal_moves:
             return mv.uci()
     except Exception:
         pass
+    # Essai UCI
     try:
         mv = chess.Move.from_uci(move_str.lower())
         if mv in board.legal_moves:
             return mv.uci()
     except Exception:
         pass
+    # Essai destination seule (ex: "e4")
+    if len(move_str) == 2 and move_str[0] in "abcdefgh" and move_str[1] in "12345678":
+        try:
+            to_sq = chess.parse_square(move_str.lower())
+            candidates = [m for m in board.legal_moves if m.to_square == to_sq]
+            if len(candidates) == 1:
+                return candidates[0].uci()
+        except Exception:
+            pass
     return None
 
 def play_move(game_id, move_uci):
@@ -118,7 +131,7 @@ if __name__ == "__main__":
     if not game_id:
         raise SystemExit(1)
 
-    # 🔹 Télécharger et parser le PGN pour savoir si c'est aux blancs
+    # 🔹 Télécharger et parser le PGN
     pgn_str = download_pgn(game_id)
     if not pgn_str:
         raise SystemExit(1)
@@ -168,3 +181,6 @@ if __name__ == "__main__":
             board_after.push(move)
         update_position_files(board_after.fen(), last_move_after)
         append_move_to_history("blanc", last_move_after, board_after.fen())
+
+    # 🗑 Nettoyage coup_blanc.txt pour éviter de rejouer
+    COUP_BLANCS_FILE.unlink(missing_ok=True)
