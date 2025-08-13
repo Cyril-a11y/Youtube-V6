@@ -52,7 +52,7 @@ jobs:
 
           if [ -z "$RESPONSE" ]; then
             echo "❌ Impossible de récupérer le PGN."
-            exit 1
+            exit 0
           fi
 
           echo "$RESPONSE" > data/game.pgn
@@ -72,6 +72,10 @@ jobs:
           with open("data/game.pgn", "r", encoding="utf-8") as f:
               game = chess.pgn.read_game(f)
 
+          if not game:
+              print("❌ Impossible de parser le PGN")
+              exit(0)
+
           board = game.board()
           moves_list = []
           for move in game.mainline_moves():
@@ -81,15 +85,21 @@ jobs:
 
           print("📜 Historique des coups :", " ".join(moves_list))
 
+          # Vérifier si la partie est finie
+          if board.is_game_over():
+              print("⚠️ Partie terminée, aucun coup joué.")
+              exit(0)
+
+          # Vérifier si c'est bien aux Noirs de jouer
           if board.turn != chess.BLACK:
-              print("❌ Ce n'est pas aux Noirs de jouer.")
+              print("⚠️ Ce n'est pas aux Noirs de jouer.")
               exit(0)
 
           # Trouver le binaire Stockfish
           stockfish_path = shutil.which("stockfish")
           if not stockfish_path:
               print("❌ Stockfish introuvable")
-              exit(1)
+              exit(0)
 
           # Calculer le coup noir
           engine = chess.engine.SimpleEngine.popen_uci(stockfish_path)
@@ -109,7 +119,7 @@ jobs:
           r = requests.post(url, headers=headers)
           print(f"📤 POST {url} -> {r.status_code} {r.text}")
           if r.status_code != 200:
-              exit(1)
+              exit(0)
 
           # Sauvegarder la position mise à jour
           fen_after = board.fen()
