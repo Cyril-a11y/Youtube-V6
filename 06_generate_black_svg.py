@@ -40,6 +40,10 @@ def generate_black_svg():
             print(f"⚠️ Impossible de lire {MOVE_HISTORY_FILE}: {e}")
 
     formatted_history = format_history(moves_list)
+    formatted_history_svg = formatted_history.replace(
+        "\n",
+        "</text><text x='20' y='" + str(720 - 55) + "' font-size='20' font-family='Arial' fill='black'>"
+    )
 
     # Générer le SVG principal
     svg = chess.svg.board(
@@ -52,12 +56,10 @@ def generate_black_svg():
     )
 
     # Ajouter l'historique en overlay avec fond semi-transparent
-    history_box = f'''
-    <rect x="10" y="{720 - 110}" width="700" height="100" rx="15" ry="15" fill="white" fill-opacity="0.8"/>
-    <text x="20" y="{720 - 80}" font-size="20" font-family="Arial" fill="black">
-        {formatted_history.replace("\n", "</text><text x='20' y='" + str(720 - 55) + "' font-size='20' font-family='Arial' fill='black'>")}
-    </text>
-    '''
+    history_box = (
+        f"<rect x='10' y='{720 - 110}' width='700' height='100' rx='15' ry='15' fill='white' fill-opacity='0.8'/>"
+        f"<text x='20' y='{720 - 80}' font-size='20' font-family='Arial' fill='black'>{formatted_history_svg}</text>"
+    )
 
     svg_with_history = svg.replace("</svg>", history_box + "\n</svg>")
 
