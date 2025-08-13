@@ -191,31 +191,38 @@ def sauvegarder_coup_blanc(coup_uci: str | None):
         log("Aucun coup à sauvegarder, fichier non modifié.", "warn")
 
 def fetch_current_board_from_lichess(game_id):
-    url = f"https://lichess.org/game/export/{game_id}?pgn=1&clocks=0&evals=0&literate=0"
+    """
+    Récupère l'état exact de la partie depuis Lichess en lisant tous les coups
+    depuis l'API /game/export, puis les applique à un plateau initial.
+    """
+    url = f"https://lichess.org/game/export/{game_id}?pgn=1&clocks=0&evaluations=0&literate=0&moves=1&tags=1"
     headers = {"Authorization": f"Bearer {LICHESS_HUMAN_TOKEN}"}
+
     try:
         r = requests.get(url, headers=headers, timeout=30)
     except Exception as e:
         log(f"Erreur réseau Lichess : {e}", "err")
         return None
+
     if r.status_code != 200:
         log(f"Erreur API Lichess : {r.status_code} {r.text[:200]}", "err")
         return None
-    
-    pgn_str = r.text
-    if not pgn_str.strip():
+
+    pgn_str = r.text.strip()
+    if not pgn_str:
         log("PGN vide reçu", "err")
         return None
-    
+
     game = chess.pgn.read_game(io.StringIO(pgn_str))
     if not game:
         log("Impossible de parser le PGN", "err")
         return None
-    
+
     board = game.board()
     for move in game.mainline_moves():
         board.push(move)
-    log(f"Plateau reconstruit depuis PGN, trait: {'blancs' if board.turn == chess.WHITE else 'noirs'}", "ok")
+
+    log(f"Plateau reconstruit depuis la liste complète des coups, trait: {'blancs' if board.turn == chess.WHITE else 'noirs'}", "ok")
     return board
 
 # -----------------------
