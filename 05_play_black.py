@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 
 # ----- Config / chemins
 REPO = "Cyril-a11y/Youtube-V6"     # <-- adapte si besoin
-BOT_WORKFLOW_FILE = "run_bot.yml"  # nom exact du fichier .yml du bot
+BOT_WORKFLOW_FILE = ".github/workflows/run_bot.yml"  # chemin complet vers le workflow bot
 GITHUB_TOKEN = os.getenv("GH_WORKFLOW_TOKEN")  # Secret GitHub
 
 LICHESS_BOT_TOKEN = os.getenv("LICHESS_BOT_TOKEN")
@@ -163,7 +163,7 @@ if __name__ == "__main__":
     if not trigger_bot_workflow(gid, elo="1500"):
         raise SystemExit(0)
 
-    for i in range(3):  # ~ 10 * 3s = 30s max
+    for i in range(3):  # 3 essais max
         time.sleep(1)
         fen_after, moves_after = fetch_game_state(gid)
         if not fen_after:
