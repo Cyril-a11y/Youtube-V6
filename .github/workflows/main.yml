@@ -42,7 +42,7 @@ jobs:
       - name: Ensure data folder exists
         run: mkdir -p data
 
-      # 6) Load secrets (les deux tokens nécessaires)
+      # 6) Load secrets
       - name: Load secrets into environment
         run: |
           echo "YOUTUBE_API_KEY=${{ secrets.YOUTUBE_API_KEY }}" >> $GITHUB_ENV
@@ -66,23 +66,23 @@ jobs:
           git diff --cached --quiet || git commit -m "Update coup_blanc.txt [skip ci]"
           git push --force-with-lease origin main || true
 
-      # 9) Play white move (humain → board:play)
+      # 9) Play white move
       - name: Play white move
         run: python 04_play_white.py
         continue-on-error: true
 
       # 10) Delay to ensure Lichess sync after white move
       - name: Delay after white move
-        run: sleep 3
+        run: sleep 2
 
-      # 11) Play black move (bot → bot:play)
+      # 11) Play black move
       - name: Play black move
         run: python 05_play_black.py
         continue-on-error: true
 
       # 12) Delay to ensure Lichess sync after black move
       - name: Delay after black move
-        run: sleep 5
+        run: sleep 2
 
       # 13) Commit updated game data
       - name: Commit updated game data
