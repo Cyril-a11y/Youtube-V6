@@ -33,6 +33,7 @@ jobs:
           LICHESS_BOT_TOKEN: ${{ secrets.LICHESS_BOT_TOKEN }}
           GAME_ID: ${{ github.event.inputs.game_id }}
           BOT_ELO: ${{ github.event.inputs.elo }}
+          FEN: ${{ steps.get_fen.outputs.fen }}
         run: |
           echo "♟️ Game ID: $GAME_ID"
 
@@ -53,36 +54,36 @@ jobs:
             exit 1
           fi
           echo "📌 FEN actuelle: $FEN"
+          export FEN
 
           # 2) Script Python pour calculer et jouer le coup noir
           cat > play_move.py <<'PY'
-import os, chess, chess.engine, requests
+          import os, chess, chess.engine, requests
 
-fen = os.environ["FEN"]
-game_id = os.environ["GAME_ID"]
-elo = int(os.environ.get("BOT_ELO", 1500))
-token = os.environ["LICHESS_BOT_TOKEN"]
+          fen = os.environ["FEN"]
+          game_id = os.environ["GAME_ID"]
+          elo = int(os.environ.get("BOT_ELO", 1500))
+          token = os.environ["LICHESS_BOT_TOKEN"]
 
-board = chess.Board(fen)
-if board.turn != chess.BLACK:
-    print("❌ Ce n'est pas aux Noirs de jouer.")
-    exit(0)
+          board = chess.Board(fen)
+          if board.turn != chess.BLACK:
+              print("❌ Ce n'est pas aux Noirs de jouer.")
+              exit(0)
 
-engine = chess.engine.SimpleEngine.popen_uci("/usr/bin/stockfish")
-engine.configure({"UCI_LimitStrength": True, "UCI_Elo": elo})
-result = engine.play(board, chess.engine.Limit(time=1.0))
-move = result.move
-engine.quit()
+          engine = chess.engine.SimpleEngine.popen_uci("/usr/bin/stockfish")
+          engine.configure({"UCI_LimitStrength": True, "UCI_Elo": elo})
+          result = engine.play(board, chess.engine.Limit(time=1.0))
+          move = result.move
+          engine.quit()
 
-print(f"🤖 Coup choisi: {move.uci()}")
+          print(f"🤖 Coup choisi: {move.uci()}")
 
-# Envoyer le coup à Lichess
-url = f"https://lichess.org/api/board/game/{game_id}/move/{move.uci()}"
-headers = {"Authorization": f"Bearer {token}"}
-r = requests.post(url, headers=headers)
-print(f"📤 POST {url} -> {r.status_code} {r.text}")
-PY
+          # Envoyer le coup à Lichess
+          url = f"https://lichess.org/api/board/game/{game_id}/move/{move.uci()}"
+          headers = {"Authorization": f"Bearer {token}"}
+          r = requests.post(url, headers=headers)
+          print(f"📤 POST {url} -> {r.status_code} {r.text}")
+          PY
+
           # 3) Exécuter le script Python
-          # The environment variables FEN, GAME_ID, and BOT_ELO are already available
-          # from the shell, so you can call the script directly.
           python3 play_move.py
