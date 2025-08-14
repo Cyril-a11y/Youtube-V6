@@ -147,8 +147,14 @@ svg_final = f"""<?xml version="1.0" encoding="UTF-8" standalone="no"?>
 SVG_FILE.write_text(svg_final, encoding="utf-8")
 print(f"✅ SVG généré : {SVG_FILE}")
 
-# --- Conversion PNG ---
-with Image(filename=str(SVG_FILE), format='svg', background=Color("white")) as img:
+# --- Conversion PNG avec vérification ---
+if not SVG_FILE.exists() or SVG_FILE.stat().st_size == 0:
+    raise RuntimeError(f"❌ Le SVG {SVG_FILE} est introuvable ou vide.")
+
+svg_data = SVG_FILE.read_text(encoding="utf-8")
+
+with Image(blob=svg_data.encode("utf-8"), format='svg', background=Color("white")) as img:
     img.format = 'png'
     img.save(filename=str(PNG_FILE))
+
 print(f"✅ PNG miniature générée : {PNG_FILE}")
