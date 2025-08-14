@@ -177,7 +177,7 @@ def sauvegarder_coup_blanc(coup_uci: str | None):
         log("Aucun coup à sauvegarder, fichier non modifié.", "warn")
 
 def fetch_current_board_from_lichess(game_id):
-    """Version fiable via /game/export avec JSON."""
+    """Version fiable via /game/export avec reconstruction si FEN manquant."""
     url = f"https://lichess.org/game/export/{game_id}?moves=1&fen=1&clocks=false&evals=false&opening=false&literate=false"
     headers = {
         "Authorization": f"Bearer {LICHESS_BOT_TOKEN}",
@@ -196,10 +196,16 @@ def fetch_current_board_from_lichess(game_id):
     except Exception as e:
         log(f"Impossible de parser JSON Lichess : {e}", "err")
         return None
+    
     fen = data.get("fen")
     if not fen:
-        log(f"Pas de FEN dans la réponse Lichess : {data}", "err")
-        return None
+        moves_str = data.get("moves", "")
+        board = chess.Board()
+        if moves_str:
+            for uci in moves_str.split():
+                board.push_uci(uci)
+        fen = board.fen()
+    
     return chess.Board(fen)
 
 # -----------------------
