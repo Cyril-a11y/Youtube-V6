@@ -26,11 +26,12 @@ jobs:
         with:
           python-version: "3.11"
 
-      # 3) Install ImageMagick (nécessaire pour wand)
+      # 3) Install ImageMagick (rapide, sans man-db)
       - name: Install ImageMagick
         run: |
           sudo apt-get update
-          sudo apt-get install -y imagemagick
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends imagemagick
+          sudo rm -f /var/lib/man-db/auto-update || true
 
       # 4) Install dependencies Python
       - name: Install dependencies
