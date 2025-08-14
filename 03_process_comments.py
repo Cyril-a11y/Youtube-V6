@@ -63,7 +63,7 @@ def charger_horodatage_dernier_coup():
         Path(LAST_MOVE_FILE).write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
         return datetime(1970, 1, 1, tzinfo=timezone.utc)
 
-def recuperer_commentaires(video_id, apres=None, max_results=100):
+def recuperer_commentaires(video_id, apres=None, max_results=50):
     """Récupère les commentaires YouTube, s'arrête dès qu'on tombe sur un plus ancien que 'apres'."""
     commentaires = []
     url = "https://www.googleapis.com/youtube/v3/commentThreads"
@@ -168,14 +168,21 @@ def sauvegarder_coup_blanc(coup_uci: str | None):
     COUP_BLANCS_FILE.parent.mkdir(parents=True, exist_ok=True)
     if coup_uci:
         COUP_BLANCS_FILE.write_text(coup_uci, encoding="utf-8")
-        log(f"coup_blanc.txt mis à jour: '{coup_uci}'", "save")
+        Path(LAST_MOVE_FILE).write_text(json.dumps(
+            {"horodatage": datetime.now(tz=timezone.utc).isoformat()},
+            ensure_ascii=False, indent=2
+        ), encoding="utf-8")
+        log(f"coup_blanc.txt mis à jour: '{coup_uci}' et dernier_coup.json actualisé", "save")
     else:
         log("Aucun coup à sauvegarder, fichier non modifié.", "warn")
 
 def fetch_current_board_from_lichess(game_id):
-    """Version rapide via /game/export avec sortie JSON."""
-    url = f"https://lichess.org/game/export/{game_id}?moves=1&fen=1&as=json"
-    headers = {"Authorization": f"Bearer {LICHESS_BOT_TOKEN}"}
+    """Version fiable via /game/export avec JSON."""
+    url = f"https://lichess.org/game/export/{game_id}?moves=1&fen=1&clocks=false&evals=false&opening=false&literate=false"
+    headers = {
+        "Authorization": f"Bearer {LICHESS_BOT_TOKEN}",
+        "Accept": "application/json"
+    }
     try:
         r = requests.get(url, headers=headers, timeout=10)
     except Exception as e:
