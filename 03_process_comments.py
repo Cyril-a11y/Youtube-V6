@@ -175,7 +175,9 @@ def sauvegarder_coup_blanc(coup_uci: str | None, horodatage=None):
         ), encoding="utf-8")
         log(f"coup_blanc.txt mis à jour: '{coup_uci}' et dernier_coup.json actualisé", "save")
     else:
-        log("Aucun coup à sauvegarder, fichier non modifié.", "warn")
+        # Vider coup_blanc.txt si aucun coup valide
+        COUP_BLANCS_FILE.write_text("", encoding="utf-8")
+        log("Aucun coup valide trouvé : coup_blanc.txt vidé.", "warn")
 
 def fetch_current_board_from_lichess(game_id):
     """Retourne (board, last_move_time) depuis Lichess."""
