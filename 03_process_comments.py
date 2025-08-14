@@ -97,7 +97,15 @@ def recuperer_commentaires(video_id, apres=None, max_results=50):
         if stop or "nextPageToken" not in data:
             break
         params["pageToken"] = data["nextPageToken"]
+
     log(f"{len(commentaires)} commentaire(s) récupéré(s) au total", "ok")
+
+    # 🔹 Affichage détaillé des commentaires
+    if commentaires:
+        log("Commentaires récupérés :", "info")
+        for i, com in enumerate(commentaires, start=1):
+            print(f"   {i}. {com}")
+
     return commentaires
 
 def _sans_accents(s: str) -> str:
@@ -175,7 +183,6 @@ def sauvegarder_coup_blanc(coup_uci: str | None, horodatage=None):
         ), encoding="utf-8")
         log(f"coup_blanc.txt mis à jour: '{coup_uci}' et dernier_coup.json actualisé", "save")
     else:
-        # Vider coup_blanc.txt si aucun coup valide
         COUP_BLANCS_FILE.write_text("", encoding="utf-8")
         log("Aucun coup valide trouvé : coup_blanc.txt vidé.", "warn")
 
