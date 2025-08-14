@@ -54,7 +54,7 @@ def charger_horodatage_dernier_coup():
             dt = datetime.fromisoformat(ts.replace("Z", "+00:00"))
         else:
             dt = datetime(1970, 1, 1, tzinfo=timezone.utc)
-        log(f"Date dernier coup : {dt}", "ok")
+        log(f"Date dernier coup (dernier_coup.json) : {dt}", "ok")
         return dt
     except FileNotFoundError:
         log("Aucun fichier dernier_coup.json trouvé, création par défaut…", "warn")
@@ -164,12 +164,13 @@ def choisir_coup_majoritaire(coups_uci):
     coup, _ = Counter(coups_uci).most_common(1)[0]
     return coup
 
-def sauvegarder_coup_blanc(coup_uci: str | None):
+def sauvegarder_coup_blanc(coup_uci: str | None, horodatage=None):
     COUP_BLANCS_FILE.parent.mkdir(parents=True, exist_ok=True)
     if coup_uci:
         COUP_BLANCS_FILE.write_text(coup_uci, encoding="utf-8")
+        horo = horodatage or datetime.now(tz=timezone.utc)
         Path(LAST_MOVE_FILE).write_text(json.dumps(
-            {"horodatage": datetime.now(tz=timezone.utc).isoformat()},
+            {"horodatage": horo.isoformat()},
             ensure_ascii=False, indent=2
         ), encoding="utf-8")
         log(f"coup_blanc.txt mis à jour: '{coup_uci}' et dernier_coup.json actualisé", "save")
@@ -177,7 +178,7 @@ def sauvegarder_coup_blanc(coup_uci: str | None):
         log("Aucun coup à sauvegarder, fichier non modifié.", "warn")
 
 def fetch_current_board_from_lichess(game_id):
-    """Version fiable via /game/export avec reconstruction si FEN manquant."""
+    """Retourne (board, last_move_time) depuis Lichess."""
     url = f"https://lichess.org/game/export/{game_id}?moves=1&fen=1&clocks=false&evals=false&opening=false&literate=false"
     headers = {
         "Authorization": f"Bearer {LICHESS_BOT_TOKEN}",
@@ -187,16 +188,22 @@ def fetch_current_board_from_lichess(game_id):
         r = requests.get(url, headers=headers, timeout=10)
     except Exception as e:
         log(f"Erreur réseau Lichess : {e}", "err")
-        return None
+        return None, None
     if r.status_code != 200:
         log(f"Erreur API Lichess : {r.status_code} {r.text[:200]}", "err")
-        return None
+        return None, None
     try:
         data = r.json()
     except Exception as e:
         log(f"Impossible de parser JSON Lichess : {e}", "err")
-        return None
-    
+        return None, None
+
+    last_move_time = None
+    if "lastMoveAt" in data:
+        last_move_time = datetime.fromtimestamp(data["lastMoveAt"] / 1000, tz=timezone.utc)
+    elif "createdAt" in data:
+        last_move_time = datetime.fromtimestamp(data["createdAt"] / 1000, tz=timezone.utc)
+
     fen = data.get("fen")
     if not fen:
         moves_str = data.get("moves", "")
@@ -205,8 +212,8 @@ def fetch_current_board_from_lichess(game_id):
             for uci in moves_str.split():
                 board.push_uci(uci)
         fen = board.fen()
-    
-    return chess.Board(fen)
+
+    return chess.Board(fen), last_move_time
 
 # -----------------------
 # Main
@@ -223,13 +230,13 @@ if __name__ == "__main__":
         if not game_id:
             sauvegarder_coup_blanc(None)
             sys.exit(0)
-        board = fetch_current_board_from_lichess(game_id)
+        board, last_move_time = fetch_current_board_from_lichess(game_id)
         if not board:
             sauvegarder_coup_blanc(None)
             sys.exit(0)
         coups_valides_uci = extraire_coups_valides(board, commentaires)
         coup_choisi_uci = choisir_coup_majoritaire(coups_valides_uci)
-        sauvegarder_coup_blanc(coup_choisi_uci)
+        sauvegarder_coup_blanc(coup_choisi_uci, horodatage=last_move_time)
         log("=== FIN DU SCRIPT ===", "info")
     except Exception as e:
         log(f"Erreur non bloquante: {e}", "err")
