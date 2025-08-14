@@ -100,7 +100,6 @@ def recuperer_commentaires(video_id, apres=None, max_results=50):
 
     log(f"{len(commentaires)} commentaire(s) récupéré(s) au total", "ok")
 
-    # 🔹 Affichage détaillé des commentaires
     if commentaires:
         log("Commentaires récupérés :", "info")
         for i, com in enumerate(commentaires, start=1):
@@ -187,7 +186,7 @@ def sauvegarder_coup_blanc(coup_uci: str | None, horodatage=None):
         log("Aucun coup valide trouvé : coup_blanc.txt vidé.", "warn")
 
 def fetch_current_board_from_lichess(game_id):
-    """Retourne (board, last_move_time) depuis Lichess."""
+    """Retourne (board, last_move_time) depuis Lichess, toujours reconstruit depuis moves."""
     url = f"https://lichess.org/game/export/{game_id}?moves=1&fen=1&clocks=false&evals=false&opening=false&literate=false"
     headers = {
         "Authorization": f"Bearer {LICHESS_BOT_TOKEN}",
@@ -213,16 +212,16 @@ def fetch_current_board_from_lichess(game_id):
     elif "createdAt" in data:
         last_move_time = datetime.fromtimestamp(data["createdAt"] / 1000, tz=timezone.utc)
 
-    fen = data.get("fen")
-    if not fen:
-        moves_str = data.get("moves", "")
-        board = chess.Board()
-        if moves_str:
-            for uci in moves_str.split():
+    moves_str = data.get("moves", "")
+    board = chess.Board()
+    if moves_str:
+        for uci in moves_str.split():
+            try:
                 board.push_uci(uci)
-        fen = board.fen()
+            except Exception as e:
+                log(f"⚠️ Coup illégal ignoré: {uci} ({e})", "warn")
 
-    return chess.Board(fen), last_move_time
+    return board, last_move_time
 
 # -----------------------
 # Main
