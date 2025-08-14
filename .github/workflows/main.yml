@@ -74,7 +74,7 @@ jobs:
 
       # 10) Delay to ensure Lichess sync after white move
       - name: Delay after white move
-        run: sleep 2
+        run: sleep 1
 
       # 11) Play black move
       - name: Play black move
@@ -83,7 +83,7 @@ jobs:
 
       # 12) Delay to ensure Lichess sync after black move
       - name: Delay after black move
-        run: sleep 2
+        run: sleep 1
 
       # 13) Commit updated game data
       - name: Commit updated game data
