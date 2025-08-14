@@ -26,40 +26,33 @@ jobs:
         with:
           python-version: "3.11"
 
-      # 3) Cache APT (ImageMagick + librsvg)
-      - name: Cache APT packages
-        uses: actions/cache@v4
-        with:
-          path: |
-            /var/lib/apt/lists
-            /var/cache/apt/archives
-          key: ${{ runner.os }}-apt-imagemagick-librsvg
-
-      # 4) Install ImageMagick + SVG support (rapide, sans man-db)
+      # 3) Install ImageMagick + SVG support (rapide, sans man-db)
       - name: Install ImageMagick + SVG support
         run: |
           sudo apt-get update -qq
           sudo apt-get remove -y --purge man-db || true
           sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends imagemagick librsvg2-bin
 
-      # 5) Cache pip
+      # 4) Cache pip
       - name: Cache pip
         uses: actions/cache@v4
         with:
           path: ~/.cache/pip
           key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
 
-      # 6) Install dependencies Python
+      # 5) Install dependencies Python
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      # 7) Ensure data folder exists
+      # 6) Ensure data folder exists
       - name: Ensure data folder exists
         run: mkdir -p data
 
-      # 8) Load secrets
+      # 7) Load secrets
       - name: Load secrets into environment
         run: |
           echo "YOUTUBE_API_KEY=${{ secrets.YOUTUBE_API_KEY }}" >> $GITHUB_ENV
@@ -68,12 +61,12 @@ jobs:
           echo "LICHESS_BOT_TOKEN=${{ secrets.LICHESS_BOT_TOKEN }}" >> $GITHUB_ENV
           echo "GH_WORKFLOW_TOKEN=${{ secrets.GH_WORKFLOW_TOKEN }}" >> $GITHUB_ENV
 
-      # 9) Process comments → coup_blanc.txt
+      # 8) Process comments → coup_blanc.txt
       - name: Process comments and select white move
         run: python 03_process_comments.py
         continue-on-error: true
 
-      # 10) Commit coup_blanc.txt
+      # 9) Commit coup_blanc.txt
       - name: Commit coup_blanc.txt
         run: |
           git config user.name "github-actions"
@@ -83,25 +76,25 @@ jobs:
           git diff --cached --quiet || git commit -m "Update coup_blanc.txt [skip ci]"
           git push --force-with-lease origin main || true
 
-      # 11) Play white move
+      # 10) Play white move
       - name: Play white move
         run: python 04_play_white.py
         continue-on-error: true
 
-      # 12) Delay after white move
+      # 11) Delay after white move
       - name: Delay after white move
         run: sleep 1
 
-      # 13) Play black move
+      # 12) Play black move
       - name: Play black move
         run: python 05_play_black.py
         continue-on-error: true
 
-      # 14) Delay after black move
+      # 13) Delay after black move
       - name: Delay after black move
         run: sleep 1
 
-      # 15) Commit updated game data
+      # 14) Commit updated game data
       - name: Commit updated game data
         run: |
           git config user.name "github-actions"
@@ -111,12 +104,12 @@ jobs:
           git diff --cached --quiet || git commit -m "Update game state after moves [skip ci]"
           git push --force-with-lease origin main || true
 
-      # 16) Generate black SVG + PNG
+      # 15) Generate black SVG + PNG
       - name: Generate black SVG & PNG
         run: python 06_generate_black_svg.py
         continue-on-error: true
 
-      # 17) Commit SVG & PNG thumbnail
+      # 16) Commit SVG & PNG thumbnail
       - name: Commit SVG & PNG thumbnail
         run: |
           git config user.name "github-actions"
