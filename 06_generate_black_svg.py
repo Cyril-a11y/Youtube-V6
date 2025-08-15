@@ -9,68 +9,61 @@ from pathlib import Path
 from wand.image import Image
 from wand.color import Color
 
-# --- Fichiers ---
 DATA_DIR = Path("data")
 SVG_FILE = DATA_DIR / "thumbnail_black.svg"
 PNG_FILE = DATA_DIR / "thumbnail_black.png"
 PGN_FILE = DATA_DIR / "game.pgn"
-GAME_ID_FILE = DATA_DIR / "game_id.txt"
 BOT_ELO_FILE = DATA_DIR / "bot_elo.txt"
 
-# --- Lecture Elo depuis fichier ---
-if BOT_ELO_FILE.exists():
-    try:
-        ELO_APPROX = int(BOT_ELO_FILE.read_text(encoding="utf-8").strip())
-    except ValueError:
-        ELO_APPROX = 1500
-else:
+# --- Lecture Elo ---
+try:
+    ELO_APPROX = int(BOT_ELO_FILE.read_text(encoding="utf-8").strip())
+except Exception:
     ELO_APPROX = 1500
 
 NOM_BLANCS = "Communauté PriseEnPassant"
 NOM_NOIRS = f"Stockfish {ELO_APPROX} Elo"
 
-# --- Couleurs échiquier ---
-def _force_board_colors(svg_str, light="#ebf0f7", dark="#6095df"):
-    svg_str = re.sub(r'(\.square\.light\s*\{\s*fill:\s*)#[0-9a-fA-F]{3,6}', r'\1' + light, svg_str)
-    svg_str = re.sub(r'(\.square\.dark\s*\{\s*fill:\s*)#[0-9a-fA-F]{3,6}', r'\1' + dark, svg_str)
-    svg_str = re.sub(r'(<rect[^>]*class="square light"[^>]*?)\s*fill="[^"]+"', r'\1', svg_str)
-    svg_str = re.sub(r'(<rect[^>]*class="square dark"[^>]*?)\s*fill="[^"]+"', r'\1', svg_str)
-    svg_str = re.sub(r'(<rect[^>]*class="square light"[^>]*)(/?>)', rf'\1 fill="{light}"\2', svg_str)
-    svg_str = re.sub(r'(<rect[^>]*class="square dark"[^>]*)(/?>)', rf'\1 fill="{dark}"\2', svg_str)
-    svg_str = re.sub(r'(<svg[^>]*>)',
-                     r'\1<style>.square.light{fill:' + light + r' !important}.square.dark{fill:' + dark + r' !important}</style>',
-                     svg_str, count=1)
-    return svg_str
-
-# --- Récupération Game ID ---
-if not GAME_ID_FILE.exists():
-    print("❌ game_id.txt introuvable")
-    exit(0)
-game_id = GAME_ID_FILE.read_text(encoding="utf-8").strip()
-
-# --- Téléchargement PGN ---
-print("📥 Téléchargement du PGN depuis Lichess…")
-token = os.getenv("LICHESS_BOT_TOKEN") or os.getenv("LICHESS_HUMAN_TOKEN")
+# --- Récupération du PGN via /api/account/playing ---
+print("📥 Récupération du PGN en cours…")
+token = os.getenv("LICHESS_BOT_TOKEN")
 if not token:
-    print("❌ Aucun token Lichess trouvé.")
-    exit(0)
+    print("❌ LICHESS_BOT_TOKEN manquant.")
+    exit(1)
 
-url = f"https://lichess.org/game/export/{game_id}?pgn=1&clocks=0&evals=0&literate=0"
-headers = {"Authorization": f"Bearer {token}"}
-r = requests.get(url, headers=headers)
+# Trouver la partie courante
+r = requests.get("https://lichess.org/api/account/playing",
+                 headers={"Authorization": f"Bearer {token}"}, timeout=10)
 if r.status_code != 200:
-    print(f"❌ Erreur Lichess: {r.status_code} {r.text}")
+    print(f"❌ Erreur Lichess account/playing: {r.status_code} {r.text[:200]}")
+    exit(1)
+
+data = r.json()
+games = data.get("nowPlaying", [])
+if not games:
+    print("⚠️ Aucune partie en cours trouvée.")
     exit(0)
 
-PGN_FILE.write_text(r.text, encoding="utf-8")
+# On prend la 1ère partie active
+game_id = games[0]["gameId"]
+
+# Télécharger le PGN
+url = f"https://lichess.org/game/export/{game_id}?pgn=1&clocks=0&evals=0&literate=0"
+resp = requests.get(url, headers={"Authorization": f"Bearer {token}"}, timeout=10)
+if resp.status_code != 200:
+    print(f"❌ Erreur téléchargement PGN: {resp.status_code} {resp.text[:200]}")
+    exit(1)
+
+PGN_FILE.write_text(resp.text, encoding="utf-8")
 print(f"✅ PGN sauvegardé dans {PGN_FILE}")
 
-# --- Reconstruction plateau ---
+# --- Reconstruction échiquier ---
 with open(PGN_FILE, "r", encoding="utf-8") as f:
     game = chess.pgn.read_game(f)
+
 if not game:
     print("❌ Impossible de parser le PGN.")
-    exit(0)
+    exit(1)
 
 board = game.board()
 moves_list = []
@@ -78,10 +71,9 @@ for move in game.mainline_moves():
     moves_list.append(board.san(move))
     board.push(move)
 
-# --- Dernier coup depuis PGN ---
 last_san = moves_list[-1] if moves_list else "?"
 
-# --- Historique formaté ---
+# --- Historique en colonnes ---
 def format_history_lines(moves):
     lignes = []
     for i in range(0, len(moves), 8):
@@ -98,16 +90,15 @@ def format_history_lines(moves):
 
 historique_lignes = format_history_lines(moves_list)
 
-# --- Génération échiquier ---
+# --- SVG échiquier ---
 svg_echiquier = chess.svg.board(
     board=board,
     orientation=chess.WHITE,
     size=620,
     lastmove=board.peek() if board.move_stack else None
 )
-svg_echiquier = _force_board_colors(svg_echiquier)
 
-# --- Construction SVG ---
+# --- Construction SVG complet ---
 historique_svg = ""
 for i, ligne in enumerate(historique_lignes):
     y = 375 + i * 34
@@ -118,53 +109,31 @@ for i, ligne in enumerate(historique_lignes):
 
 tour = (len(moves_list) // 2) + 1
 
-svg_final = f"""<?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<svg width="1280" height="720" xmlns="http://www.w3.org/2000/svg">
+svg_final = f"""<svg width="1280" height="720" xmlns="http://www.w3.org/2000/svg">
   <rect width="100%" height="100%" fill="#f9fafb"/>
-  <text x="75%" y="60" text-anchor="middle" font-size="35" font-family="Ubuntu" fill="#1f2937">
-    ♟️ Partie Interactive !
-  </text>
-  <text x="700" y="105" font-size="22" font-family="Ubuntu" fill="#1f2937">
-    1. Postez votre coup en commentaire.
-  </text>
-  <text x="700" y="135" font-size="22" font-family="Ubuntu" fill="#1f2937">
-    2. Le coup majoritaire sera joué automatiquement !
-  </text>
   <g transform="translate(40,50)">
     {svg_echiquier}
   </g>
   <text x="700" y="180" font-size="28" font-family="Ubuntu" fill="#111">
     Dernier coup : {last_san}
   </text>
-  <text x="700" y="230" font-size="30" font-family="Ubuntu" fill="#111">
-    🧠 Choisissez le prochain coup !
-  </text>
   <text x="700" y="280" font-size="24" font-family="Ubuntu" fill="#555">
     🕒 Tour : {tour}
   </text>
-  <rect x="680" y="295" width="540" height="340" fill="#ffffff" stroke="#d1d5db" stroke-width="1" rx="8" ry="8"/>
-  <text x="700" y="330" font-size="26" font-family="Ubuntu" fill="#1f2937">
-    📜 Historique des coups :
-  </text>
+  <rect x="680" y="295" width="540" height="340" fill="#fff" stroke="#d1d5db" stroke-width="1" rx="8" ry="8"/>
   {historique_svg}
-  <text x="750" y="675" font-size="25" font-family="Ubuntu" fill="#1f2937" font-weight="bold">
-    Chaîne YOUTUBE : PriseEnPassant
-  </text>
-  <text x="50" y="40" font-size="24" font-family="Ubuntu" fill="#1f2937">
-    ♟️ {NOM_NOIRS}
-  </text>
-  <text x="50" y="700" font-size="24" font-family="Ubuntu" fill="#1f2937">
-    ♟️ {NOM_BLANCS}
-  </text>
-</svg>
-"""
+</svg>"""
 
 SVG_FILE.write_text(svg_final, encoding="utf-8")
 print(f"✅ SVG généré : {SVG_FILE}")
 
-# --- Conversion PNG ---
-with Image(blob=SVG_FILE.read_bytes(), format='svg', background=Color("white")) as img:
-    img.format = 'png'
-    img.save(filename=str(PNG_FILE))
-
-print(f"✅ PNG miniature générée : {PNG_FILE}")
+# --- Conversion PNG robuste ---
+try:
+    with Image(filename=str(SVG_FILE), resolution=144) as img:
+        img.format = 'png'
+        img.background_color = Color("white")
+        img.alpha_channel = 'remove'
+        img.save(filename=str(PNG_FILE))
+    print(f"✅ PNG miniature générée : {PNG_FILE}")
+except Exception as e:
+    print(f"❌ Erreur conversion PNG: {e}")
