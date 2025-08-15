@@ -35,16 +35,13 @@ R . B Q K B N R</pre></desc><defs><g id="white-pawn" class="white pawn"><path d=
   </text>
   
     <text x="700" y="375" font-size="22" font-family="Ubuntu" fill="#333">
-        <tspan fill="red" font-weight="bold">1.</tspan> e4 Nf6 <tspan fill="red" font-weight="bold">2.</tspan> Nc3 g6
-    </text>
-    <text x="700" y="409" font-size="22" font-family="Ubuntu" fill="#333">
-        <tspan fill="red" font-weight="bold">3.</tspan> a3
+        <tspan fill="red" font-weight="bold">1.</tspan> e4 Nf6 <tspan fill="red" font-weight="bold">2.</tspan> Nc3 g6 <tspan fill="red" font-weight="bold">3.</tspan> a3
     </text>
   <text x="750" y="675" font-size="25" font-family="Ubuntu" fill="#1f2937" font-weight="bold">
     Chaîne YOUTUBE : PriseEnPassant
   </text>
   <text x="50" y="40" font-size="24" font-family="Ubuntu" fill="#1f2937">
-    ♟️ Stockfish Niveau : 8
+    ♟️ Stockfish ~1500 Elo
   </text>
   <text x="50" y="700" font-size="24" font-family="Ubuntu" fill="#1f2937">
     ♟️ Communauté PriseEnPassant
