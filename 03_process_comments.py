@@ -64,7 +64,7 @@ def charger_horodatage_dernier_coup():
         return datetime(1970, 1, 1, tzinfo=timezone.utc)
 
 def recuperer_commentaires(video_id, apres=None, max_results=50):
-    """Récupère les commentaires YouTube, s'arrête dès qu'on tombe sur un plus ancien que 'apres'."""
+    """Récupère les commentaires YouTube, uniquement ceux plus récents que 'apres'."""
     commentaires = []
     url = "https://www.googleapis.com/youtube/v3/commentThreads"
     params = {
@@ -83,17 +83,23 @@ def recuperer_commentaires(video_id, apres=None, max_results=50):
         if r.status_code != 200:
             log(f"Erreur API YouTube : {r.status_code} {r.text[:200]}", "err")
             break
+
         data = r.json()
         stop = False
         for item in data.get("items", []):
             snippet = item["snippet"]["topLevelComment"]["snippet"]
             texte = snippet["textDisplay"]
             date_pub = datetime.fromisoformat(snippet["publishedAt"].replace("Z", "+00:00"))
+
             if apres and date_pub <= apres:
+                # On arrête la pagination après cette page
                 stop = True
-                break
+                continue  # Ne pas ajouter ce commentaire trop vieux
+
             commentaires.append(texte)
+
         log(f"Page récupérée, total commentaires valides : {len(commentaires)}", "find")
+
         if stop or "nextPageToken" not in data:
             break
         params["pageToken"] = data["nextPageToken"]
