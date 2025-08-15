@@ -23,7 +23,7 @@ except ValueError:
     ELO_APPROX = 1500
 
 NOM_BLANCS = "Communauté PriseEnPassant"
-NOM_NOIRS = f"Stockfish ~{ELO_APPROX} Elo"
+NOM_NOIRS = f"Stockfish {ELO_APPROX} Elo"
 
 # --- Couleurs échiquier ---
 def _force_board_colors(svg_str, light="#ebf0f7", dark="#6095df"):
