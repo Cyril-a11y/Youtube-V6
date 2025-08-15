@@ -15,11 +15,15 @@ SVG_FILE = DATA_DIR / "thumbnail_black.svg"
 PNG_FILE = DATA_DIR / "thumbnail_black.png"
 PGN_FILE = DATA_DIR / "game.pgn"
 GAME_ID_FILE = DATA_DIR / "game_id.txt"
+BOT_ELO_FILE = DATA_DIR / "bot_elo.txt"
 
-# --- Paramètres joueurs ---
-try:
-    ELO_APPROX = int(os.getenv("BOT_ELO", "1500"))
-except ValueError:
+# --- Lecture Elo depuis fichier ---
+if BOT_ELO_FILE.exists():
+    try:
+        ELO_APPROX = int(BOT_ELO_FILE.read_text(encoding="utf-8").strip())
+    except ValueError:
+        ELO_APPROX = 1500
+else:
     ELO_APPROX = 1500
 
 NOM_BLANCS = "Communauté PriseEnPassant"
@@ -80,11 +84,11 @@ last_san = moves_list[-1] if moves_list else "?"
 # --- Historique formaté ---
 def format_history_lines(moves):
     lignes = []
-    for i in range(0, len(moves), 8):  # coupe tous les 8 demi-coups
+    for i in range(0, len(moves), 8):
         bloc = moves[i:i+8]
         bloc_num = []
         for j, coup in enumerate(bloc):
-            if j % 2 == 0:  # coup des Blancs => numéro de tour
+            if j % 2 == 0:
                 tour_num = (i + j) // 2 + 1
                 bloc_num.append(f'<tspan fill="red" font-weight="bold">{tour_num}.</tspan> {coup}')
             else:
@@ -94,7 +98,7 @@ def format_history_lines(moves):
 
 historique_lignes = format_history_lines(moves_list)
 
-# --- Génération échiquier (Blancs toujours en bas) ---
+# --- Génération échiquier ---
 svg_echiquier = chess.svg.board(
     board=board,
     orientation=chess.WHITE,
@@ -103,7 +107,7 @@ svg_echiquier = chess.svg.board(
 )
 svg_echiquier = _force_board_colors(svg_echiquier)
 
-# --- Construction SVG esthétique complet ---
+# --- Construction SVG ---
 historique_svg = ""
 for i, ligne in enumerate(historique_lignes):
     y = 375 + i * 34
