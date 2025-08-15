@@ -17,9 +17,13 @@ PGN_FILE = DATA_DIR / "game.pgn"
 GAME_ID_FILE = DATA_DIR / "game_id.txt"
 
 # --- Paramètres joueurs ---
-NIVEAU_STOCKFISH = os.getenv("STOCKFISH_LEVEL", "8")  # valeur par défaut
+try:
+    ELO_APPROX = int(os.getenv("BOT_ELO", "1500"))
+except ValueError:
+    ELO_APPROX = 1500
+
 NOM_BLANCS = "Communauté PriseEnPassant"
-NOM_NOIRS = f"Stockfish Niveau : {NIVEAU_STOCKFISH}"
+NOM_NOIRS = f"Stockfish ~{ELO_APPROX} Elo"
 
 # --- Couleurs échiquier ---
 def _force_board_colors(svg_str, light="#ebf0f7", dark="#6095df"):
@@ -76,7 +80,7 @@ last_san = moves_list[-1] if moves_list else "?"
 # --- Historique formaté ---
 def format_history_lines(moves):
     lignes = []
-    for i in range(0, len(moves), 8):  # ⬅️ maintenant on coupe tous les 8 demi-coups
+    for i in range(0, len(moves), 8):  # coupe tous les 8 demi-coups
         bloc = moves[i:i+8]
         bloc_num = []
         for j, coup in enumerate(bloc):
