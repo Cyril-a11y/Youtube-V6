@@ -10,7 +10,7 @@ on:
       elo:
         description: "Elo simulé par Stockfish (1350–2850)"
         required: false
-        default: "1500"
+        default: "1750"
 
 permissions:
   contents: write
@@ -67,6 +67,9 @@ jobs:
           game_id = os.environ["GAME_ID"]
           elo = int(os.environ.get("BOT_ELO", 1500))
           token = os.environ["LICHESS_BOT_TOKEN"]
+
+          # Sauvegarder l'Elo dans un fichier pour la miniature
+          Path("data/bot_elo.txt").write_text(str(elo), encoding="utf-8")
 
           # Lire le PGN et reconstruire la position
           with open("data/game.pgn", "r", encoding="utf-8") as f:
@@ -151,21 +154,17 @@ jobs:
           })
           history_file.write_text(json.dumps(history, ensure_ascii=False, indent=2), encoding="utf-8")
 
-          print("✅ position.fen, dernier_coup.json, move_history.json mis à jour")
+          print("✅ position.fen, dernier_coup.json, move_history.json, bot_elo.txt mis à jour")
           PY
 
           python3 play_move.py
 
-      # 4) Rendre BOT_ELO dispo pour le script de miniature
-      - name: Export BOT_ELO to env
-        run: echo "BOT_ELO=${{ github.event.inputs.elo }}" >> $GITHUB_ENV
-
-      # 5) Commit & push avec rebase pour éviter les conflits
+      # 4) Commit & push avec rebase pour éviter les conflits
       - name: Commit updated files
         run: |
           git config user.name "github-actions"
           git config user.email "actions@github.com"
           git pull --rebase origin main || true
-          git add data/position.fen data/dernier_coup.json data/move_history.json || true
+          git add data/position.fen data/dernier_coup.json data/move_history.json data/bot_elo.txt || true
           git diff --cached --quiet || git commit -m "MAJ après coup noir"
           git push --force-with-lease origin main || true
