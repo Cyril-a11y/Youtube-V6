@@ -2,7 +2,6 @@
 
 import os
 import requests
-from pathlib import Path
 
 # ----- Config -----
 REPO = "Cyril-a11y/Youtube-V6"
@@ -15,6 +14,10 @@ def log(msg, tag="ℹ️"):
 
 def get_current_game_bot():
     """Trouve la partie en cours du bot via /api/account/playing"""
+    if not LICHESS_BOT_TOKEN:
+        log("❌ LICHESS_BOT_TOKEN manquant", "❌")
+        return None
+
     url = "https://lichess.org/api/account/playing"
     headers = {"Authorization": f"Bearer {LICHESS_BOT_TOKEN}"}
     r = requests.get(url, headers=headers, timeout=10)
@@ -25,7 +28,7 @@ def get_current_game_bot():
     data = r.json()
     games = data.get("nowPlaying", [])
     if not games:
-        log("Aucune partie en cours trouvée pour le bot.", "⚠️")
+        log("⚠️ Aucune partie en cours trouvée pour le bot.")
         return None
 
     for g in games:
@@ -35,7 +38,7 @@ def get_current_game_bot():
                 "fen": g["fen"]
             }
 
-    log("Aucune partie où c'est au bot (noirs) de jouer.", "⚠️")
+    log("⚠️ Aucune partie où c'est au bot (noirs) de jouer.")
     return None
 
 def is_black_to_move(fen: str) -> bool:
@@ -53,7 +56,7 @@ def _gh_headers():
 
 def trigger_bot_workflow(game_id: str, elo: str = "1500"):
     if not GITHUB_TOKEN:
-        log("Pas de GH_WORKFLOW_TOKEN défini.", "❌")
+        log("❌ Pas de GH_WORKFLOW_TOKEN défini.", "❌")
         return False
     url = f"https://api.github.com/repos/{REPO}/actions/workflows/{WORKFLOW_FILENAME}/dispatches"
     payload = {"ref": "main", "inputs": {"game_id": game_id, "elo": elo}}
