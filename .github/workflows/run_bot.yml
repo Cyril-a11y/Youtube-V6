@@ -156,7 +156,11 @@ jobs:
 
           python3 play_move.py
 
-      # 4) Commit & push avec rebase pour éviter les conflits
+      # 4) Rendre BOT_ELO dispo pour le script de miniature
+      - name: Export BOT_ELO to env
+        run: echo "BOT_ELO=${{ github.event.inputs.elo }}" >> $GITHUB_ENV
+
+      # 5) Commit & push avec rebase pour éviter les conflits
       - name: Commit updated files
         run: |
           git config user.name "github-actions"
