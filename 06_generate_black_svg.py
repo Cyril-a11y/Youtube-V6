@@ -8,7 +8,6 @@ import requests
 from pathlib import Path
 from wand.image import Image
 from wand.color import Color
-from dataclasses import dataclass
 
 # --- Fichiers ---
 DATA_DIR = Path("data")
@@ -17,13 +16,10 @@ PNG_FILE = DATA_DIR / "thumbnail_black.png"
 PGN_FILE = DATA_DIR / "game.pgn"
 GAME_ID_FILE = DATA_DIR / "game_id.txt"
 
-@dataclass
-class ThumbParams:
-    coup_joue: str
-    tour: int
-    historique_lignes: list
-    nom_blancs: str = "Blancs"
-    nom_noirs: str = "Noirs"
+# --- Paramètres joueurs ---
+NIVEAU_STOCKFISH = os.getenv("STOCKFISH_LEVEL", "8")  # valeur par défaut
+NOM_BLANCS = "Communauté PriseEnPassant"
+NOM_NOIRS = f"Stockfish Niveau : {NIVEAU_STOCKFISH}"
 
 # --- Couleurs échiquier ---
 def _force_board_colors(svg_str, light="#ebf0f7", dark="#6095df"):
@@ -79,13 +75,26 @@ last_san = moves_list[-1] if moves_list else "?"
 
 # --- Historique formaté ---
 def format_history_lines(moves):
-    return [" ".join(moves[i:i+4]) for i in range(0, len(moves), 4)]
+    lignes = []
+    for i in range(0, len(moves), 4):
+        bloc = moves[i:i+4]
+        # numérotation en rouge
+        bloc_num = []
+        for j, coup in enumerate(bloc):
+            if j % 2 == 0:  # coup des Blancs => numéro de tour
+                tour_num = (i + j) // 2 + 1
+                bloc_num.append(f'<tspan fill="red" font-weight="bold">{tour_num}.</tspan> {coup}')
+            else:
+                bloc_num.append(coup)
+        lignes.append(" ".join(bloc_num))
+    return lignes
+
 historique_lignes = format_history_lines(moves_list)
 
-# --- Génération échiquier ---
+# --- Génération échiquier (Blancs toujours en bas) ---
 svg_echiquier = chess.svg.board(
     board=board,
-    orientation=chess.BLACK,
+    orientation=chess.WHITE,
     size=620,
     lastmove=board.peek() if board.move_stack else None
 )
@@ -95,10 +104,9 @@ svg_echiquier = _force_board_colors(svg_echiquier)
 historique_svg = ""
 for i, ligne in enumerate(historique_lignes):
     y = 375 + i * 34
-    ligne_modifiee = re.sub(r"(\d+\.)", r'<tspan fill="red" font-weight="bold">\1</tspan>', ligne)
     historique_svg += f"""
     <text x="700" y="{y}" font-size="22" font-family="Ubuntu" fill="#333">
-        {ligne_modifiee}
+        {ligne}
     </text>"""
 
 tour = (len(moves_list) // 2) + 1
@@ -136,10 +144,10 @@ svg_final = f"""<?xml version="1.0" encoding="UTF-8" standalone="no"?>
     Chaîne YOUTUBE : PriseEnPassant
   </text>
   <text x="50" y="40" font-size="24" font-family="Ubuntu" fill="#1f2937">
-    ♟️ Noirs
+    ♟️ {NOM_NOIRS}
   </text>
   <text x="50" y="700" font-size="24" font-family="Ubuntu" fill="#1f2937">
-    ♟️ Blancs
+    ♟️ {NOM_BLANCS}
   </text>
 </svg>
 """
@@ -147,13 +155,8 @@ svg_final = f"""<?xml version="1.0" encoding="UTF-8" standalone="no"?>
 SVG_FILE.write_text(svg_final, encoding="utf-8")
 print(f"✅ SVG généré : {SVG_FILE}")
 
-# --- Conversion PNG avec vérification ---
-if not SVG_FILE.exists() or SVG_FILE.stat().st_size == 0:
-    raise RuntimeError(f"❌ Le SVG {SVG_FILE} est introuvable ou vide.")
-
-svg_data = SVG_FILE.read_text(encoding="utf-8")
-
-with Image(blob=svg_data.encode("utf-8"), format='svg', background=Color("white")) as img:
+# --- Conversion PNG ---
+with Image(blob=SVG_FILE.read_bytes(), format='svg', background=Color("white")) as img:
     img.format = 'png'
     img.save(filename=str(PNG_FILE))
 
