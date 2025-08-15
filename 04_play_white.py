@@ -1,4 +1,4 @@
-# 04_play_white.py — version "account/playing" fiable
+# 04_play_white.py — version "account/playing" fiable sans position_before_white.json
 import os
 import requests
 import json
@@ -16,7 +16,6 @@ LICHESS_HUMAN_TOKEN = os.getenv("LICHESS_HUMAN_TOKEN")
 LAST_MOVE_FILE = Path("data/dernier_coup.json")
 FEN_FILE = Path("data/position.fen")
 COUP_BLANCS_FILE = Path("data/coup_blanc.txt")
-POSITION_BEFORE_FILE = Path("data/position_before_white.json")
 MOVE_HISTORY_FILE = Path("data/move_history.json")
 PGN_FILE = Path("data/game.pgn")
 
@@ -77,11 +76,6 @@ def download_pgn(game_id):
         return None
     PGN_FILE.write_text(r.text, encoding="utf-8")
     return r.text
-
-def save_position_before_move(fen):
-    payload = {"fen": fen, "horodatage": datetime.now(timezone.utc).isoformat()}
-    POSITION_BEFORE_FILE.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
-    log(f"Position avant coup sauvegardée dans {POSITION_BEFORE_FILE}", "save")
 
 def update_position_files(fen, last_move):
     FEN_FILE.write_text(fen or "", encoding="utf-8")
@@ -152,10 +146,7 @@ if __name__ == "__main__":
         raise SystemExit(0)  # Pas de partie à jouer
 
     game_id = game_info["game_id"]
-    fen = game_info["fen"]
-    board = chess.Board(fen)
-
-    save_position_before_move(board.fen())
+    board = chess.Board(game_info["fen"])
 
     move_str = load_white_move()
     if not move_str:
