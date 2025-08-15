@@ -1,4 +1,4 @@
-# 04_play_white.py — version streaming API pour état temps réel
+# 04_play_white.py — version "account/playing" fiable
 import os
 import requests
 import json
@@ -13,7 +13,6 @@ from pathlib import Path
 # Config et fichiers
 # -----------------------
 LICHESS_HUMAN_TOKEN = os.getenv("LICHESS_HUMAN_TOKEN")
-GAME_ID_FILE = Path("data/game_id.txt")
 LAST_MOVE_FILE = Path("data/dernier_coup.json")
 FEN_FILE = Path("data/position.fen")
 COUP_BLANCS_FILE = Path("data/coup_blanc.txt")
@@ -35,58 +34,38 @@ def log(msg, type="info"):
     }
     print(f"{icons.get(type, '•')} {msg}")
 
-def load_game_id():
-    if not GAME_ID_FILE.exists():
-        log("game_id.txt introuvable", "err")
-        return None
-    gid = GAME_ID_FILE.read_text(encoding="utf-8").strip()
-    log(f"Game ID chargé : {gid}", "ok")
-    return gid
-
 def load_white_move():
     if not COUP_BLANCS_FILE.exists():
         log("coup_blanc.txt introuvable.", "err")
         return None
     return COUP_BLANCS_FILE.read_text(encoding="utf-8").strip()
 
-def fetch_board_state_stream(game_id):
-    """
-    Récupère l'état en direct via /api/board/game/stream/{gameId}
-    Retourne (board, moves_list)
-    """
-    url = f"https://lichess.org/api/board/game/stream/{game_id}"
+def get_current_game():
+    """Trouve la partie en cours via /api/account/playing"""
+    url = "https://lichess.org/api/account/playing"
     headers = {"Authorization": f"Bearer {LICHESS_HUMAN_TOKEN}"}
-    r = requests.get(url, headers=headers, stream=True, timeout=15)
+    r = requests.get(url, headers=headers, timeout=10)
     if r.status_code != 200:
-        log(f"Erreur API Lichess stream : {r.status_code} {r.text[:200]}", "err")
-        return None, None
+        log(f"Erreur API account/playing : {r.status_code} {r.text[:200]}", "err")
+        return None
 
-    for line in r.iter_lines():
-        if not line:
-            continue
-        try:
-            data = json.loads(line.decode("utf-8"))
-        except Exception:
-            continue
+    data = r.json()
+    games = data.get("nowPlaying", [])
+    if not games:
+        log("Aucune partie en cours trouvée.", "warn")
+        return None
 
-        if "type" in data and data["type"] == "gameFull":
-            state = data.get("state", {})
-            fen = state.get("fen")
-            moves_str = state.get("moves", "")
-            if fen:
-                board = chess.Board(fen)
-                moves = moves_str.split() if moves_str else []
-                return board, moves
+    for g in games:
+        if g.get("isMyTurn") and g.get("color") == "white":
+            return {
+                "game_id": g["gameId"],
+                "fen": g["fen"],
+                "moves": g.get("lastMove", ""),
+                "full_moves": g.get("moves", "").split()
+            }
 
-        elif "type" in data and data["type"] == "gameState":
-            fen = data.get("fen")
-            moves_str = data.get("moves", "")
-            if fen:
-                board = chess.Board(fen)
-                moves = moves_str.split() if moves_str else []
-                return board, moves
-
-    return None, None
+    log("Aucune partie où c'est à toi (blancs) de jouer.", "warn")
+    return None
 
 def download_pgn(game_id):
     """Télécharge le PGN brut pour archive/historique."""
@@ -168,20 +147,15 @@ def play_move(game_id, move_uci):
 # Main
 # -----------------------
 if __name__ == "__main__":
-    game_id = load_game_id()
-    if not game_id:
-        raise SystemExit(1)
+    game_info = get_current_game()
+    if not game_info:
+        raise SystemExit(0)  # Pas de partie à jouer
 
-    # 📥 État direct via streaming
-    board, moves = fetch_board_state_stream(game_id)
-    if not board:
-        raise SystemExit(1)
+    game_id = game_info["game_id"]
+    fen = game_info["fen"]
+    board = chess.Board(fen)
 
     save_position_before_move(board.fen())
-
-    if board.turn != chess.WHITE:
-        log("Ce n'est pas aux Blancs de jouer.", "warn")
-        raise SystemExit(0)
 
     move_str = load_white_move()
     if not move_str:
@@ -201,7 +175,6 @@ if __name__ == "__main__":
 
     time.sleep(2)
 
-    # 📥 Télécharger PGN complet pour archive
     pgn_after = download_pgn(game_id)
     if pgn_after:
         game_after = chess.pgn.read_game(io.StringIO(pgn_after))
