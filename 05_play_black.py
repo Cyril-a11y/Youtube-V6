@@ -1,9 +1,7 @@
-# 05_play_black.py — déclenchement du workflow
+# 05_play_black.py — version "account/playing" fiable
 
 import os
 import requests
-import io
-import chess.pgn
 from pathlib import Path
 
 # ----- Config -----
@@ -11,34 +9,34 @@ REPO = "Cyril-a11y/Youtube-V6"
 WORKFLOW_FILENAME = "run_bot.yml"
 GITHUB_TOKEN = os.getenv("GH_WORKFLOW_TOKEN")
 LICHESS_BOT_TOKEN = os.getenv("LICHESS_BOT_TOKEN")
-GAME_ID_FILE = Path("data/game_id.txt")
 
 def log(msg, tag="ℹ️"):
     print(f"{tag} {msg}")
 
-def load_game_id():
-    if not GAME_ID_FILE.exists():
-        log("game_id.txt introuvable", "❌")
-        return None
-    gid = GAME_ID_FILE.read_text(encoding="utf-8").strip()
-    log(f"✅ Game ID chargé : {gid}")
-    return gid
-
-def fetch_fen_from_pgn(game_id):
-    url = f"https://lichess.org/game/export/{game_id}"
-    params = {"pgn": "1"}
-    headers = {"Authorization": f"Bearer {LICHESS_BOT_TOKEN}"} if LICHESS_BOT_TOKEN else {}
-    log(f"📤 GET {url}?pgn=1")
-    r = requests.get(url, params=params, headers=headers, timeout=20)
+def get_current_game_bot():
+    """Trouve la partie en cours du bot via /api/account/playing"""
+    url = "https://lichess.org/api/account/playing"
+    headers = {"Authorization": f"Bearer {LICHESS_BOT_TOKEN}"}
+    r = requests.get(url, headers=headers, timeout=10)
     if r.status_code != 200:
-        log(f"❌ Erreur {r.status_code}: {r.text[:200]}")
+        log(f"Erreur API account/playing : {r.status_code} {r.text[:200]}", "❌")
         return None
-    pgn_io = io.StringIO(r.text.strip())
-    game = chess.pgn.read_game(pgn_io)
-    board = game.board()
-    for move in game.mainline_moves():
-        board.push(move)
-    return board.fen()
+
+    data = r.json()
+    games = data.get("nowPlaying", [])
+    if not games:
+        log("Aucune partie en cours trouvée pour le bot.", "⚠️")
+        return None
+
+    for g in games:
+        if g.get("isMyTurn") and g.get("color") == "black":
+            return {
+                "game_id": g["gameId"],
+                "fen": g["fen"]
+            }
+
+    log("Aucune partie où c'est au bot (noirs) de jouer.", "⚠️")
+    return None
 
 def is_black_to_move(fen: str) -> bool:
     try:
@@ -66,18 +64,22 @@ def trigger_bot_workflow(game_id: str, elo: str = "1500"):
     log(f"❌ Erreur dispatch ({r.status_code}): {r.text}")
     return False
 
+# -----------------------
+# Main
+# -----------------------
 if __name__ == "__main__":
-    gid = load_game_id()
-    if not gid:
-        raise SystemExit(1)
+    game_info = get_current_game_bot()
+    if not game_info:
+        raise SystemExit(0)  # Pas de partie à jouer
 
-    fen = fetch_fen_from_pgn(gid)
-    if not fen:
-        raise SystemExit(1)
+    game_id = game_info["game_id"]
+    fen = game_info["fen"]
 
-    log(f"Trait actuel: {'noirs' if is_black_to_move(fen) else 'blancs'}")
+    log(f"Game ID détecté : {game_id}")
+    log(f"Trait actuel : {'noirs' if is_black_to_move(fen) else 'blancs'}")
+
     if not is_black_to_move(fen):
         log("ℹ️ Ce n'est pas aux Noirs de jouer — arrêt.")
         raise SystemExit(0)
 
-    trigger_bot_workflow(gid, elo="1500")
+    trigger_bot_workflow(game_id, elo="1500")
