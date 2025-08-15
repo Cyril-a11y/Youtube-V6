@@ -54,12 +54,12 @@ def _gh_headers():
         "X-GitHub-Api-Version": "2022-11-28",
     }
 
-def trigger_bot_workflow(game_id: str, elo: str = "1500"):
+def trigger_bot_workflow(elo: str = "1500"):
     if not GITHUB_TOKEN:
         log("❌ Pas de GH_WORKFLOW_TOKEN défini.", "❌")
         return False
     url = f"https://api.github.com/repos/{REPO}/actions/workflows/{WORKFLOW_FILENAME}/dispatches"
-    payload = {"ref": "main", "inputs": {"game_id": game_id, "elo": elo}}
+    payload = {"ref": "main", "inputs": {"elo": elo}}  # ⬅️ plus de game_id
     r = requests.post(url, headers=_gh_headers(), json=payload, timeout=20)
     if r.status_code == 204:
         log("✅ Workflow bot déclenché.")
@@ -85,4 +85,4 @@ if __name__ == "__main__":
         log("ℹ️ Ce n'est pas aux Noirs de jouer — arrêt.")
         raise SystemExit(0)
 
-    trigger_bot_workflow(game_id, elo="1500")
+    trigger_bot_workflow(elo="1500")
