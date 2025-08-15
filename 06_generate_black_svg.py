@@ -76,9 +76,8 @@ last_san = moves_list[-1] if moves_list else "?"
 # --- Historique formaté ---
 def format_history_lines(moves):
     lignes = []
-    for i in range(0, len(moves), 4):
-        bloc = moves[i:i+4]
-        # numérotation en rouge
+    for i in range(0, len(moves), 8):  # ⬅️ maintenant on coupe tous les 8 demi-coups
+        bloc = moves[i:i+8]
         bloc_num = []
         for j, coup in enumerate(bloc):
             if j % 2 == 0:  # coup des Blancs => numéro de tour
