@@ -3,10 +3,6 @@ name: Run Lichess Bot (Direct Black Move from PGN)
 on:
   workflow_dispatch:
     inputs:
-      game_id:
-        description: "ID de la partie Lichess"
-        required: true
-        type: string
       elo:
         description: "Elo simulé par Stockfish (1350–2850)"
         required: false
@@ -31,7 +27,7 @@ jobs:
       - name: Install Stockfish & Python deps
         run: |
           sudo apt-get update
-          sudo apt-get install -y stockfish python3-pip
+          sudo apt-get install -y stockfish python3-pip jq
           python3 -m pip install --upgrade pip
           python3 -m pip install python-chess requests
 
@@ -39,12 +35,22 @@ jobs:
       - name: Play best black move from PGN and update files
         env:
           LICHESS_BOT_TOKEN: ${{ secrets.LICHESS_BOT_TOKEN }}
-          GAME_ID: ${{ github.event.inputs.game_id }}
           BOT_ELO: ${{ github.event.inputs.elo }}
         run: |
           mkdir -p data
 
-          echo "♟️ Game ID: $GAME_ID"
+          # 0) Détection automatique du game_id via l'API account/playing
+          GAME_ID=$(curl -s -H "Authorization: Bearer $LICHESS_BOT_TOKEN" \
+            https://lichess.org/api/account/playing \
+            | jq -r '.nowPlaying[] | select(.isMyTurn == true and .color == "black") | .gameId')
+
+          if [ -z "$GAME_ID" ] || [ "$GAME_ID" = "null" ]; then
+            echo "⚠️ Aucune partie trouvée où c'est au bot noir de jouer."
+            exit 0
+          fi
+
+          echo "♟️ Partie détectée: $GAME_ID"
+          export GAME_ID
 
           # 1) Télécharger le PGN brut depuis Lichess
           RESPONSE=$(curl -s -H "Authorization: Bearer $LICHESS_BOT_TOKEN" \
