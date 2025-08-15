@@ -1,4 +1,4 @@
-# 04_play_white.py — version fiable avec état JSON + PGN
+# 04_play_white.py — version streaming API pour état temps réel
 import os
 import requests
 import json
@@ -49,21 +49,44 @@ def load_white_move():
         return None
     return COUP_BLANCS_FILE.read_text(encoding="utf-8").strip()
 
-def fetch_board_state(game_id):
-    """Récupère la FEN et la liste des coups depuis Lichess (JSON)."""
-    url = f"https://lichess.org/game/export/{game_id}?moves=1&fen=1"
-    headers = {
-        "Authorization": f"Bearer {LICHESS_HUMAN_TOKEN}",
-        "Accept": "application/json"
-    }
-    r = requests.get(url, headers=headers, timeout=15)
+def fetch_board_state_stream(game_id):
+    """
+    Récupère l'état en direct via /api/board/game/stream/{gameId}
+    Retourne (board, moves_list)
+    """
+    url = f"https://lichess.org/api/board/game/stream/{game_id}"
+    headers = {"Authorization": f"Bearer {LICHESS_HUMAN_TOKEN}"}
+    r = requests.get(url, headers=headers, stream=True, timeout=15)
     if r.status_code != 200:
-        log(f"Erreur API Lichess : {r.status_code} {r.text[:200]}", "err")
+        log(f"Erreur API Lichess stream : {r.status_code} {r.text[:200]}", "err")
         return None, None
-    data = r.json()
-    board = chess.Board(data["fen"])
-    moves = data.get("moves", "").split()
-    return board, moves
+
+    for line in r.iter_lines():
+        if not line:
+            continue
+        try:
+            data = json.loads(line.decode("utf-8"))
+        except Exception:
+            continue
+
+        if "type" in data and data["type"] == "gameFull":
+            state = data.get("state", {})
+            fen = state.get("fen")
+            moves_str = state.get("moves", "")
+            if fen:
+                board = chess.Board(fen)
+                moves = moves_str.split() if moves_str else []
+                return board, moves
+
+        elif "type" in data and data["type"] == "gameState":
+            fen = data.get("fen")
+            moves_str = data.get("moves", "")
+            if fen:
+                board = chess.Board(fen)
+                moves = moves_str.split() if moves_str else []
+                return board, moves
+
+    return None, None
 
 def download_pgn(game_id):
     """Télécharge le PGN brut pour archive/historique."""
@@ -149,8 +172,8 @@ if __name__ == "__main__":
     if not game_id:
         raise SystemExit(1)
 
-    # 📥 Récupération de l'état réel
-    board, moves = fetch_board_state(game_id)
+    # 📥 État direct via streaming
+    board, moves = fetch_board_state_stream(game_id)
     if not board:
         raise SystemExit(1)
 
@@ -176,10 +199,9 @@ if __name__ == "__main__":
 
     log(f"Coup joué : {move_uci} ({san_str})", "ok")
 
-    # ⏳ On attend un peu pour être sûr que Lichess enregistre
     time.sleep(2)
 
-    # 📥 Télécharger le PGN complet pour archive
+    # 📥 Télécharger PGN complet pour archive
     pgn_after = download_pgn(game_id)
     if pgn_after:
         game_after = chess.pgn.read_game(io.StringIO(pgn_after))
@@ -191,5 +213,4 @@ if __name__ == "__main__":
         update_position_files(board_after.fen(), last_move_after)
         append_move_to_history("blanc", last_move_after, board_after.fen())
 
-    # 🗑 Supprime le coup pour éviter de le rejouer
     COUP_BLANCS_FILE.unlink(missing_ok=True)
