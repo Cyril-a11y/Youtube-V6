@@ -1,4 +1,4 @@
-# 04_play_white.py — version fiable avec PGN
+# 04_play_white.py — version fiable avec état JSON + PGN
 import os
 import requests
 import json
@@ -28,7 +28,11 @@ if not LICHESS_HUMAN_TOKEN:
 # Utilitaires
 # -----------------------
 def log(msg, type="info"):
-    icons = {"ok": "✅", "err": "❌", "warn": "⚠️", "info": "ℹ️", "find": "🔎", "save": "💾", "send": "📤", "recv": "📥"}
+    icons = {
+        "ok": "✅", "err": "❌", "warn": "⚠️",
+        "info": "ℹ️", "find": "🔎", "save": "💾",
+        "send": "📤", "recv": "📥"
+    }
     print(f"{icons.get(type, '•')} {msg}")
 
 def load_game_id():
@@ -45,14 +49,31 @@ def load_white_move():
         return None
     return COUP_BLANCS_FILE.read_text(encoding="utf-8").strip()
 
+def fetch_board_state(game_id):
+    """Récupère la FEN et la liste des coups depuis Lichess (JSON)."""
+    url = f"https://lichess.org/game/export/{game_id}?moves=1&fen=1"
+    headers = {
+        "Authorization": f"Bearer {LICHESS_HUMAN_TOKEN}",
+        "Accept": "application/json"
+    }
+    r = requests.get(url, headers=headers, timeout=15)
+    if r.status_code != 200:
+        log(f"Erreur API Lichess : {r.status_code} {r.text[:200]}", "err")
+        return None, None
+    data = r.json()
+    board = chess.Board(data["fen"])
+    moves = data.get("moves", "").split()
+    return board, moves
+
 def download_pgn(game_id):
+    """Télécharge le PGN brut pour archive/historique."""
     url = f"https://lichess.org/game/export/{game_id}?pgn=1&clocks=0&evals=0&literate=0"
     headers = {"Authorization": f"Bearer {LICHESS_HUMAN_TOKEN}"}
     r = requests.get(url, headers=headers, timeout=30)
     if r.status_code != 200:
         log(f"Erreur API Lichess : {r.status_code} {r.text[:200]}", "err")
         return None
-    PGN_FILE.write_text(r.text, encoding="utf-8")  # 💾 Sauvegarde du PGN brut
+    PGN_FILE.write_text(r.text, encoding="utf-8")
     return r.text
 
 def save_position_before_move(fen):
@@ -90,21 +111,18 @@ def append_move_to_history(couleur, coup, fen):
 
 def to_uci(board, move_str):
     move_str = move_str.strip()
-    # Essai SAN
     try:
         mv = board.parse_san(move_str)
         if mv in board.legal_moves:
             return mv.uci()
     except Exception:
         pass
-    # Essai UCI
     try:
         mv = chess.Move.from_uci(move_str.lower())
         if mv in board.legal_moves:
             return mv.uci()
     except Exception:
         pass
-    # Essai destination seule (ex: "e4")
     if len(move_str) == 2 and move_str[0] in "abcdefgh" and move_str[1] in "12345678":
         try:
             to_sq = chess.parse_square(move_str.lower())
@@ -131,21 +149,10 @@ if __name__ == "__main__":
     if not game_id:
         raise SystemExit(1)
 
-    # 🔹 Télécharger et parser le PGN
-    pgn_str = download_pgn(game_id)
-    if not pgn_str:
+    # 📥 Récupération de l'état réel
+    board, moves = fetch_board_state(game_id)
+    if not board:
         raise SystemExit(1)
-
-    game = chess.pgn.read_game(io.StringIO(pgn_str))
-    if not game:
-        log("Impossible de parser le PGN.", "err")
-        raise SystemExit(1)
-
-    board = game.board()
-    last_move = None
-    for move in game.mainline_moves():
-        last_move = move.uci()
-        board.push(move)
 
     save_position_before_move(board.fen())
 
@@ -169,8 +176,10 @@ if __name__ == "__main__":
 
     log(f"Coup joué : {move_uci} ({san_str})", "ok")
 
-    # 🕒 Re-télécharger après le coup
+    # ⏳ On attend un peu pour être sûr que Lichess enregistre
     time.sleep(2)
+
+    # 📥 Télécharger le PGN complet pour archive
     pgn_after = download_pgn(game_id)
     if pgn_after:
         game_after = chess.pgn.read_game(io.StringIO(pgn_after))
@@ -182,5 +191,5 @@ if __name__ == "__main__":
         update_position_files(board_after.fen(), last_move_after)
         append_move_to_history("blanc", last_move_after, board_after.fen())
 
-    # 🗑 Nettoyage coup_blanc.txt pour éviter de rejouer
+    # 🗑 Supprime le coup pour éviter de le rejouer
     COUP_BLANCS_FILE.unlink(missing_ok=True)
