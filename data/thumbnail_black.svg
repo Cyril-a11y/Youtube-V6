@@ -1,17 +1,7 @@
-<?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <svg width="1280" height="720" xmlns="http://www.w3.org/2000/svg">
   <rect width="100%" height="100%" fill="#f9fafb"/>
-  <text x="75%" y="60" text-anchor="middle" font-size="35" font-family="Ubuntu" fill="#1f2937">
-    ♟️ Partie Interactive !
-  </text>
-  <text x="700" y="105" font-size="22" font-family="Ubuntu" fill="#1f2937">
-    1. Postez votre coup en commentaire.
-  </text>
-  <text x="700" y="135" font-size="22" font-family="Ubuntu" fill="#1f2937">
-    2. Le coup majoritaire sera joué automatiquement !
-  </text>
   <g transform="translate(40,50)">
-    <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 390 390" width="620" height="620"><style>.square.light{fill:#ebf0f7 !important}.square.dark{fill:#6095df !important}</style><desc><pre>r n b q k . . r
+    <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 390 390" width="620" height="620"><desc><pre>r n b q k . . r
 p p p p p p b p
 . . . . . n p .
 . . . . . . . .
@@ -23,27 +13,12 @@ R . B Q K B N R</pre></desc><defs><g id="white-pawn" class="white pawn"><path d=
   <text x="700" y="180" font-size="28" font-family="Ubuntu" fill="#111">
     Dernier coup : Bg7
   </text>
-  <text x="700" y="230" font-size="30" font-family="Ubuntu" fill="#111">
-    🧠 Choisissez le prochain coup !
-  </text>
   <text x="700" y="280" font-size="24" font-family="Ubuntu" fill="#555">
     🕒 Tour : 4
   </text>
-  <rect x="680" y="295" width="540" height="340" fill="#ffffff" stroke="#d1d5db" stroke-width="1" rx="8" ry="8"/>
-  <text x="700" y="330" font-size="26" font-family="Ubuntu" fill="#1f2937">
-    📜 Historique des coups :
-  </text>
+  <rect x="680" y="295" width="540" height="340" fill="#fff" stroke="#d1d5db" stroke-width="1" rx="8" ry="8"/>
   
     <text x="700" y="375" font-size="22" font-family="Ubuntu" fill="#333">
         <tspan fill="red" font-weight="bold">1.</tspan> e4 Nf6 <tspan fill="red" font-weight="bold">2.</tspan> Nc3 g6 <tspan fill="red" font-weight="bold">3.</tspan> a3 Bg7
     </text>
-  <text x="750" y="675" font-size="25" font-family="Ubuntu" fill="#1f2937" font-weight="bold">
-    Chaîne YOUTUBE : PriseEnPassant
-  </text>
-  <text x="50" y="40" font-size="24" font-family="Ubuntu" fill="#1f2937">
-    ♟️ Stockfish 1500 Elo
-  </text>
-  <text x="50" y="700" font-size="24" font-family="Ubuntu" fill="#1f2937">
-    ♟️ Communauté PriseEnPassant
-  </text>
 </svg>
