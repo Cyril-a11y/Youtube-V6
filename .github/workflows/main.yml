@@ -31,7 +31,7 @@ jobs:
         run: |
           sudo apt-get update -qq
           sudo apt-get remove -y --purge man-db || true
-          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends imagemagick librsvg2-bin
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends imagemagick librsvg2-bin libmagickcore-6.q16-6-extra
 
       # 4) Cache pip
       - name: Cache pip
