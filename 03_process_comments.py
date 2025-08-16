@@ -150,21 +150,32 @@ def sauvegarder_coup_blanc(coup, horodatage):
     else:
         log("Aucun coup valide trouvé", "warn")
 
-def fetch_current_board_from_lichess(game_id):
-    url = f"https://lichess.org/game/export/{game_id}?moves=1&fen=1"
-    headers = {"Authorization": f"Bearer {LICHESS_BOT_TOKEN}", "Accept": "application/json"}
+def fetch_current_board_from_lichess():
+    """Récupère l'état de la partie en cours via /api/account/playing"""
+    url = "https://lichess.org/api/account/playing"
+    headers = {"Authorization": f"Bearer {LICHESS_BOT_TOKEN}"}
     r = requests.get(url, headers=headers, timeout=10)
     if r.status_code != 200:
+        log(f"Erreur API account/playing: {r.status_code} {r.text[:200]}", "err")
         return None, None
+
     data = r.json()
-    moves_str = data.get("moves", "")
-    board = chess.Board()
-    for uci in moves_str.split():
-        try:
-            board.push_uci(uci)
-        except Exception:
-            pass
-    last_move_time = datetime.fromtimestamp(data.get("lastMoveAt", 0)/1000, tz=timezone.utc)
+    games = data.get("nowPlaying", [])
+    if not games:
+        log("⚠️ Aucune partie en cours pour le bot", "warn")
+        return None, None
+
+    g = games[0]  # prend la première partie active
+    moves_str = g.get("moves", "")
+    fen = g["fen"]
+
+    # État actuel du board depuis FEN
+    board = chess.Board(fen)
+
+    last_move_time = None
+    if "lastMoveAt" in g:
+        last_move_time = datetime.fromtimestamp(g["lastMoveAt"]/1000, tz=timezone.utc)
+
     return board, last_move_time
 
 # -----------------------
@@ -183,7 +194,7 @@ if __name__ == "__main__":
         sauvegarder_coup_blanc(None, dernier_coup_time)
         sys.exit(0)
 
-    board, last_move_time = fetch_current_board_from_lichess(game_id)
+    board, last_move_time = fetch_current_board_from_lichess()
     if not board:
         sauvegarder_coup_blanc(None, dernier_coup_time)
         sys.exit(0)
