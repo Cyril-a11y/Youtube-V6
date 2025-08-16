@@ -2,12 +2,14 @@
 
 import os
 import requests
+from pathlib import Path
 
 # ----- Config -----
 REPO = "Cyril-a11y/Youtube-V6"
 WORKFLOW_FILENAME = "run_bot.yml"
 GITHUB_TOKEN = os.getenv("GH_WORKFLOW_TOKEN")
 LICHESS_BOT_TOKEN = os.getenv("LICHESS_BOT_TOKEN")
+BOT_ELO_FILE = Path("data/bot_elo.txt")
 
 def log(msg, tag="ℹ️"):
     print(f"{tag} {msg}")
@@ -53,10 +55,10 @@ def trigger_bot_workflow(elo: str = "1500"):
         log("Pas de GH_WORKFLOW_TOKEN défini.", "❌")
         return False
     url = f"https://api.github.com/repos/{REPO}/actions/workflows/{WORKFLOW_FILENAME}/dispatches"
-    payload = {"ref": "main", "inputs": {"elo": elo}}  # ⬅️ plus de game_id
+    payload = {"ref": "main", "inputs": {"elo": elo}}
     r = requests.post(url, headers=_gh_headers(), json=payload, timeout=20)
     if r.status_code == 204:
-        log("✅ Workflow bot déclenché.")
+        log(f"✅ Workflow bot déclenché avec Elo={elo}.")
         return True
     log(f"Erreur dispatch ({r.status_code}): {r.text}", "❌")
     return False
@@ -70,11 +72,19 @@ if __name__ == "__main__":
         raise SystemExit(0)  # Pas de partie à jouer
 
     fen = game_info["fen"]
-
     log(f"FEN serveur : {fen}")
 
     if " b " not in fen:
         log("ℹ️ Ce n'est pas aux Noirs de jouer — arrêt.")
         raise SystemExit(0)
 
-    trigger_bot_workflow(elo="1500")
+    # Lire Elo depuis le fichier bot_elo.txt (sinon fallback 1500)
+    try:
+        BOT_ELO = BOT_ELO_FILE.read_text(encoding="utf-8").strip()
+        if not BOT_ELO.isdigit():
+            BOT_ELO = "1500"
+    except Exception:
+        BOT_ELO = "1500"
+
+    log(f"Elo actuel choisi : {BOT_ELO}")
+    trigger_bot_workflow(elo=BOT_ELO)
