@@ -64,27 +64,30 @@ last_move = g.get("lastMove")
 
 print(f"♟️ Partie détectée: {game_id}")
 print("FEN actuelle:", fen)
-print("Dernier coup:", last_move)
+print("Dernier coup UCI:", last_move)
 print("Nb coups joués:", len(moves))
 
 # --- Reconstruction échiquier ---
 board = chess.Board(fen)
 
-# Convertir coups UCI -> SAN
+# Convertir coups UCI -> SAN (depuis la position initiale)
 moves_list = []
 tmp_board = chess.Board()
 for uci in moves:
-    mv = chess.Move.from_uci(uci)
-    san = tmp_board.san(mv)
-    moves_list.append(san)
-    tmp_board.push(mv)
+    try:
+        mv = chess.Move.from_uci(uci)
+        san = tmp_board.san(mv)
+        moves_list.append(san)
+        tmp_board.push(mv)
+    except Exception as e:
+        print(f"⚠️ Coup ignoré ({uci}): {e}")
 
 last_san = moves_list[-1] if moves_list else "?"
 
 # --- Historique formaté ---
 def format_history_lines(moves):
     lignes = []
-    for i in range(0, len(moves), 4):  # retour à la ligne toutes les 4 demi-moves (2 tours complets)
+    for i in range(0, len(moves), 4):  # retour à la ligne toutes les 4 demi-moves
         bloc = moves[i:i+4]
         bloc_num = []
         for j, coup in enumerate(bloc):
@@ -96,7 +99,10 @@ def format_history_lines(moves):
         lignes.append(" ".join(bloc_num))
     return lignes
 
-historique_lignes = format_history_lines(moves_list)
+if not moves_list:
+    historique_lignes = ["(aucun coup pour le moment)"]
+else:
+    historique_lignes = format_history_lines(moves_list)
 
 # --- Génération échiquier SVG ---
 svg_echiquier = chess.svg.board(
