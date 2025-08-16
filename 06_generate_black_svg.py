@@ -69,20 +69,18 @@ print("Nb coups joués:", len(uci_moves))
 print("Coups UCI bruts:", uci_moves)
 
 # --- Reconstruction échiquier ---
+# 1) Plateau courant depuis FEN
 board = chess.Board(fen)
 
-# Reconstruction historique SAN à partir des coups UCI
+# 2) Plateau complet reconstruit depuis le début pour obtenir SAN
+tmp_board = chess.Board()  # position initiale standard
 moves_list = []
-tmp_board = chess.Board()  # position initiale
 for uci in uci_moves:
     try:
         mv = chess.Move.from_uci(uci)
-        if mv in tmp_board.legal_moves:
-            san = tmp_board.san(mv)
-            moves_list.append(san)
-            tmp_board.push(mv)
-        else:
-            print(f"⚠️ Coup illégal ignoré : {uci}")
+        san = tmp_board.san(mv)
+        moves_list.append(san)
+        tmp_board.push(mv)
     except Exception as e:
         print(f"⚠️ Erreur sur {uci}: {e}")
 
@@ -99,7 +97,7 @@ def format_history_lines(moves):
             lignes.append(f'<tspan fill="red" font-weight="bold">{num}.</tspan> {bloc[0]}')
         else:
             lignes.append(f'<tspan fill="red" font-weight="bold">{num}.</tspan> {bloc[0]} {bloc[1]}')
-    # retour à la ligne toutes les 4 demi-moves (2 coups)
+    # retour à la ligne toutes les 2 coups (4 demi-coups)
     lignes_split = []
     for j in range(0, len(lignes), 2):
         lignes_split.append(" ".join(lignes[j:j+2]))
@@ -128,6 +126,7 @@ for i, ligne in enumerate(historique_lignes):
         {ligne}
     </text>"""
 
+# numéro du tour basé sur moves_list (correct)
 tour = (len(moves_list) // 2) + 1
 
 svg_final = f"""<?xml version="1.0" encoding="UTF-8" standalone="no"?>
@@ -187,10 +186,13 @@ svg_final = f"""<?xml version="1.0" encoding="UTF-8" standalone="no"?>
 SVG_FILE.write_text(svg_final, encoding="utf-8")
 print(f"✅ SVG généré : {SVG_FILE}")
 
-# --- Conversion PNG ---
+# --- Conversion PNG robuste ---
 try:
-    with Image(blob=SVG_FILE.read_bytes(), format='svg', background=Color("white")) as img:
-        img.format = 'png'
+    with Image(blob=SVG_FILE.read_bytes(), format="svg") as img:
+        img.background_color = Color("white")
+        img.alpha_channel = "remove"
+        img.resize(1280, 720)  # taille fixée
+        img.format = "png"
         img.save(filename=str(PNG_FILE))
     print(f"✅ PNG miniature générée : {PNG_FILE}")
 except Exception as e:
