@@ -1,4 +1,4 @@
-# 05_play_black.py — version "account/playing" fiable
+# 05_play_black.py — version robuste avec account/playing
 
 import os
 import requests
@@ -15,7 +15,7 @@ def log(msg, tag="ℹ️"):
 def get_current_game_bot():
     """Trouve la partie en cours du bot via /api/account/playing"""
     if not LICHESS_BOT_TOKEN:
-        log("❌ LICHESS_BOT_TOKEN manquant", "❌")
+        log("LICHESS_BOT_TOKEN manquant", "❌")
         return None
 
     url = "https://lichess.org/api/account/playing"
@@ -32,6 +32,7 @@ def get_current_game_bot():
         return None
 
     for g in games:
+        log(f"🎯 Partie détectée: {g.get('gameId')} | trait: {g.get('fen')} | isMyTurn={g.get('isMyTurn')} | couleur={g.get('color')}")
         if g.get("isMyTurn") and g.get("color") == "black":
             return {
                 "game_id": g["gameId"],
@@ -41,12 +42,6 @@ def get_current_game_bot():
     log("⚠️ Aucune partie où c'est au bot (noirs) de jouer.")
     return None
 
-def is_black_to_move(fen: str) -> bool:
-    try:
-        return fen.split()[1] == "b"
-    except Exception:
-        return False
-
 def _gh_headers():
     return {
         "Authorization": f"Bearer {GITHUB_TOKEN}",
@@ -54,17 +49,17 @@ def _gh_headers():
         "X-GitHub-Api-Version": "2022-11-28",
     }
 
-def trigger_bot_workflow(elo: str = "1500"):
+def trigger_bot_workflow(game_id: str, elo: str = "1500"):
     if not GITHUB_TOKEN:
-        log("❌ Pas de GH_WORKFLOW_TOKEN défini.", "❌")
+        log("Pas de GH_WORKFLOW_TOKEN défini.", "❌")
         return False
     url = f"https://api.github.com/repos/{REPO}/actions/workflows/{WORKFLOW_FILENAME}/dispatches"
-    payload = {"ref": "main", "inputs": {"elo": elo}}  # ⬅️ plus de game_id
+    payload = {"ref": "main", "inputs": {"elo": elo, "game_id": game_id}}
     r = requests.post(url, headers=_gh_headers(), json=payload, timeout=20)
     if r.status_code == 204:
         log("✅ Workflow bot déclenché.")
         return True
-    log(f"❌ Erreur dispatch ({r.status_code}): {r.text}")
+    log(f"Erreur dispatch ({r.status_code}): {r.text}", "❌")
     return False
 
 # -----------------------
@@ -79,10 +74,10 @@ if __name__ == "__main__":
     fen = game_info["fen"]
 
     log(f"Game ID détecté : {game_id}")
-    log(f"Trait actuel : {'noirs' if is_black_to_move(fen) else 'blancs'}")
+    log(f"FEN serveur : {fen}")
 
-    if not is_black_to_move(fen):
+    if " b " not in fen:
         log("ℹ️ Ce n'est pas aux Noirs de jouer — arrêt.")
         raise SystemExit(0)
 
-    trigger_bot_workflow(elo="1500")
+    trigger_bot_workflow(game_id, elo="1500")
