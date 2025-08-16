@@ -27,7 +27,11 @@ jobs:
       - name: Save Elo to bot_elo.txt
         run: |
           mkdir -p data
-          echo "${{ github.event.inputs.elo }}" > data/bot_elo.txt
+          ELO="${{ github.event.inputs.elo }}"
+          if [ -z "$ELO" ] || [ "$ELO" = "null" ]; then
+            ELO=1750
+          fi
+          echo "$ELO" > data/bot_elo.txt
           echo "📌 Elo sauvegardé dans data/bot_elo.txt : $(cat data/bot_elo.txt)"
 
       # 3) Installer Stockfish + dépendances Python
@@ -67,7 +71,7 @@ jobs:
           echo "$GAME_FEN" > data/position_before_black.fen
           echo "$GAME_MOVES" > data/moves_before_black.txt
 
-          # 2) Script Python pour jouer le coup noir et mettre à jour les fichiers
+          # Script Python pour jouer le coup noir
           cat > play_move.py <<'PY'
           import os, json, shutil, chess, chess.engine, requests
           from pathlib import Path
