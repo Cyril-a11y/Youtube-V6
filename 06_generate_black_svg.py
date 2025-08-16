@@ -1,7 +1,5 @@
 import os
 import json
-import reimport os
-import json
 import re
 import chess
 import requests
