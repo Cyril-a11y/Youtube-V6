@@ -1,4 +1,4 @@
-# 05_play_black.py — version robuste avec account/playing
+# 05_play_black.py — version robuste avec account/playing (sans game_id)
 
 import os
 import requests
@@ -35,7 +35,6 @@ def get_current_game_bot():
         log(f"🎯 Partie détectée: {g.get('gameId')} | trait: {g.get('fen')} | isMyTurn={g.get('isMyTurn')} | couleur={g.get('color')}")
         if g.get("isMyTurn") and g.get("color") == "black":
             return {
-                "game_id": g["gameId"],
                 "fen": g["fen"]
             }
 
@@ -49,12 +48,12 @@ def _gh_headers():
         "X-GitHub-Api-Version": "2022-11-28",
     }
 
-def trigger_bot_workflow(game_id: str, elo: str = "1500"):
+def trigger_bot_workflow(elo: str = "1500"):
     if not GITHUB_TOKEN:
         log("Pas de GH_WORKFLOW_TOKEN défini.", "❌")
         return False
     url = f"https://api.github.com/repos/{REPO}/actions/workflows/{WORKFLOW_FILENAME}/dispatches"
-    payload = {"ref": "main", "inputs": {"elo": elo, "game_id": game_id}}
+    payload = {"ref": "main", "inputs": {"elo": elo}}  # ⬅️ plus de game_id
     r = requests.post(url, headers=_gh_headers(), json=payload, timeout=20)
     if r.status_code == 204:
         log("✅ Workflow bot déclenché.")
@@ -70,14 +69,12 @@ if __name__ == "__main__":
     if not game_info:
         raise SystemExit(0)  # Pas de partie à jouer
 
-    game_id = game_info["game_id"]
     fen = game_info["fen"]
 
-    log(f"Game ID détecté : {game_id}")
     log(f"FEN serveur : {fen}")
 
     if " b " not in fen:
         log("ℹ️ Ce n'est pas aux Noirs de jouer — arrêt.")
         raise SystemExit(0)
 
-    trigger_bot_workflow(game_id, elo="1500")
+    trigger_bot_workflow(elo="1500")
