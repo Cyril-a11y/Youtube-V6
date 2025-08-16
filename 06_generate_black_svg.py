@@ -1,6 +1,7 @@
 import os
 import json
 import re
+import io
 import chess
 import chess.pgn
 import chess.svg
@@ -47,20 +48,19 @@ if not games:
 # On prend la 1ère partie active
 game_id = games[0]["gameId"]
 
-# Télécharger le PGN
-url = f"https://lichess.org/game/export/{game_id}?pgn=1&clocks=0&evals=0&literate=0"
+# Télécharger le PGN + FEN serveur
+url = f"https://lichess.org/game/export/{game_id}?pgn=1&fen=1&moves=1&clocks=0&evals=0&literate=0"
 resp = requests.get(url, headers={"Authorization": f"Bearer {token}"}, timeout=10)
 if resp.status_code != 200:
     print(f"❌ Erreur téléchargement PGN: {resp.status_code} {resp.text[:200]}")
     exit(1)
 
-PGN_FILE.write_text(resp.text, encoding="utf-8")
+pgn_text = resp.text
+PGN_FILE.write_text(pgn_text, encoding="utf-8")
 print(f"✅ PGN sauvegardé dans {PGN_FILE}")
 
 # --- Reconstruction échiquier ---
-with open(PGN_FILE, "r", encoding="utf-8") as f:
-    game = chess.pgn.read_game(f)
-
+game = chess.pgn.read_game(io.StringIO(pgn_text))
 if not game:
     print("❌ Impossible de parser le PGN.")
     exit(1)
@@ -72,6 +72,14 @@ for move in game.mainline_moves():
     board.push(move)
 
 last_san = moves_list[-1] if moves_list else "?"
+
+# 🔑 Vérification avec FEN serveur
+fen_match = re.search(r'\[FEN "(.*?)"\]', pgn_text)
+if fen_match:
+    fen_serveur = fen_match.group(1)
+    if board.fen() != fen_serveur:
+        print(f"⚠️ Décalage détecté : PGN={board.fen()} vs serveur={fen_serveur}")
+        board = chess.Board(fen_serveur)
 
 # --- Historique en colonnes ---
 def format_history_lines(moves):
