@@ -110,18 +110,30 @@ def nettoyer_et_corriger_san(commentaire: str) -> str:
 def extraire_coups_valides(board, commentaires):
     valides = []
     for com in commentaires:
+        log(f"📝 Commentaire brut : {com}", "info")
         token = nettoyer_et_corriger_san(com)
+        log(f"   ↳ Token nettoyé : {token}", "info")
+
+        move = None
         try:
             move = board.parse_san(token)
+            log(f"   ✅ Interprété comme SAN : {move.uci()}", "ok")
         except Exception:
             try:
                 move = chess.Move.from_uci(token.lower())
-                if move not in board.legal_moves:
-                    continue
+                if move in board.legal_moves:
+                    log(f"   ✅ Interprété comme UCI : {move.uci()}", "ok")
+                else:
+                    log(f"   ❌ UCI non légal : {token}", "warn")
+                    move = None
             except Exception:
-                continue
-        if move in board.legal_moves:
+                log(f"   ❌ Échec parsing SAN/UCI", "warn")
+
+        if move and move in board.legal_moves:
             valides.append(move.uci())
+        else:
+            log(f"   ❌ Coup rejeté : {token}", "warn")
+
     return valides
 
 def choisir_coup_majoritaire(coups):
