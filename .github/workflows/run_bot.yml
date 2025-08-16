@@ -23,7 +23,14 @@ jobs:
         with:
           fetch-depth: 0
 
-      # 2) Installer Stockfish + dépendances Python
+      # 2) Sauvegarder Elo choisi dans bot_elo.txt
+      - name: Save Elo to bot_elo.txt
+        run: |
+          mkdir -p data
+          echo "${{ github.event.inputs.elo }}" > data/bot_elo.txt
+          echo "📌 Elo sauvegardé dans data/bot_elo.txt : $(cat data/bot_elo.txt)"
+
+      # 3) Installer Stockfish + dépendances Python
       - name: Install Stockfish & Python deps
         run: |
           sudo apt-get update
@@ -31,11 +38,10 @@ jobs:
           python3 -m pip install --upgrade pip
           python3 -m pip install python-chess requests
 
-      # 3) Jouer le coup noir (live avec account/playing)
+      # 4) Jouer le coup noir (live avec account/playing)
       - name: Play best black move (live)
         env:
           LICHESS_BOT_TOKEN: ${{ secrets.LICHESS_BOT_TOKEN }}
-          BOT_ELO: ${{ github.event.inputs.elo }}
         run: |
           mkdir -p data
 
@@ -69,11 +75,15 @@ jobs:
 
           data_dir = Path("data")
           game_id = os.environ["GAME_ID"]
-          elo = int(os.environ.get("BOT_ELO", 1500))
           token = os.environ["LICHESS_BOT_TOKEN"]
 
-          # Sauvegarder Elo
-          (data_dir / "bot_elo.txt").write_text(str(elo), encoding="utf-8")
+          # Lire Elo depuis bot_elo.txt
+          try:
+              elo = int((data_dir / "bot_elo.txt").read_text(encoding="utf-8").strip())
+          except Exception:
+              elo = 1500
+
+          print(f"📌 Elo utilisé pour Stockfish: {elo}")
 
           # Lire FEN et moves
           fen_path = data_dir / "position_before_black.fen"
@@ -147,12 +157,12 @@ jobs:
           })
           history_file.write_text(json.dumps(history, ensure_ascii=False, indent=2), encoding="utf-8")
 
-          print("✅ position.fen, dernier_coup.json, move_history.json, bot_elo.txt mis à jour")
+          print("✅ position.fen, dernier_coup.json, move_history.json mis à jour (bot_elo.txt déjà présent)")
           PY
 
           python3 play_move.py
 
-      # 4) Commit & push avec rebase
+      # 5) Commit & push avec rebase
       - name: Commit updated files
         run: |
           git config user.name "github-actions"
