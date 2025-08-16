@@ -59,45 +59,51 @@ if not games:
 g = games[0]
 game_id = g["gameId"]
 fen = g["fen"]
-moves = g.get("moves", "").split()
+uci_moves = g.get("moves", "").split()
 last_move = g.get("lastMove")
 
 print(f"♟️ Partie détectée: {game_id}")
 print("FEN actuelle:", fen)
 print("Dernier coup UCI:", last_move)
-print("Nb coups joués:", len(moves))
+print("Nb coups joués:", len(uci_moves))
+print("Coups UCI bruts:", uci_moves)
 
 # --- Reconstruction échiquier ---
 board = chess.Board(fen)
 
-# Convertir coups UCI -> SAN (depuis la position initiale)
+# Reconstruction historique SAN à partir des coups UCI
 moves_list = []
-tmp_board = chess.Board()
-for uci in moves:
+tmp_board = chess.Board()  # position initiale
+for uci in uci_moves:
     try:
         mv = chess.Move.from_uci(uci)
-        san = tmp_board.san(mv)
-        moves_list.append(san)
-        tmp_board.push(mv)
+        if mv in tmp_board.legal_moves:
+            san = tmp_board.san(mv)
+            moves_list.append(san)
+            tmp_board.push(mv)
+        else:
+            print(f"⚠️ Coup illégal ignoré : {uci}")
     except Exception as e:
-        print(f"⚠️ Coup ignoré ({uci}): {e}")
+        print(f"⚠️ Erreur sur {uci}: {e}")
 
+print("Historique SAN:", moves_list)
 last_san = moves_list[-1] if moves_list else "?"
 
 # --- Historique formaté ---
 def format_history_lines(moves):
     lignes = []
-    for i in range(0, len(moves), 4):  # retour à la ligne toutes les 4 demi-moves
-        bloc = moves[i:i+4]
-        bloc_num = []
-        for j, coup in enumerate(bloc):
-            if j % 2 == 0:
-                tour_num = (i + j) // 2 + 1
-                bloc_num.append(f'<tspan fill="red" font-weight="bold">{tour_num}.</tspan> {coup}')
-            else:
-                bloc_num.append(coup)
-        lignes.append(" ".join(bloc_num))
-    return lignes
+    for i in range(0, len(moves), 2):  # chaque tour = 2 demi-coups
+        num = (i // 2) + 1
+        bloc = moves[i:i+2]
+        if len(bloc) == 1:
+            lignes.append(f'<tspan fill="red" font-weight="bold">{num}.</tspan> {bloc[0]}')
+        else:
+            lignes.append(f'<tspan fill="red" font-weight="bold">{num}.</tspan> {bloc[0]} {bloc[1]}')
+    # retour à la ligne toutes les 4 demi-moves (2 coups)
+    lignes_split = []
+    for j in range(0, len(lignes), 2):
+        lignes_split.append(" ".join(lignes[j:j+2]))
+    return lignes_split
 
 if not moves_list:
     historique_lignes = ["(aucun coup pour le moment)"]
