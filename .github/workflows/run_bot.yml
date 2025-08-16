@@ -1,4 +1,4 @@
-name: Run Lichess Bot (Direct Black Move from PGN)
+name: Run Lichess Bot (Direct Black Move Live)
 
 on:
   workflow_dispatch:
@@ -31,18 +31,17 @@ jobs:
           python3 -m pip install --upgrade pip
           python3 -m pip install python-chess requests
 
-      # 3) Jouer le coup noir
-      - name: Play best black move from PGN and update files
+      # 3) Jouer le coup noir (live avec account/playing)
+      - name: Play best black move (live)
         env:
           LICHESS_BOT_TOKEN: ${{ secrets.LICHESS_BOT_TOKEN }}
           BOT_ELO: ${{ github.event.inputs.elo }}
         run: |
           mkdir -p data
 
-          # 0) Détection automatique du game_id via l'API account/playing
-          GAME_ID=$(curl -s -H "Authorization: Bearer $LICHESS_BOT_TOKEN" \
-            https://lichess.org/api/account/playing \
-            | jq -r '.nowPlaying[] | select(.isMyTurn == true and .color == "black") | .gameId')
+          # Récupérer infos partie en live
+          GAME_JSON=$(curl -s -H "Authorization: Bearer $LICHESS_BOT_TOKEN" https://lichess.org/api/account/playing)
+          GAME_ID=$(echo "$GAME_JSON" | jq -r '.nowPlaying[] | select(.isMyTurn == true and .color == "black") | .gameId')
 
           if [ -z "$GAME_ID" ] || [ "$GAME_ID" = "null" ]; then
             echo "⚠️ Aucune partie trouvée où c'est au bot noir de jouer."
@@ -52,65 +51,55 @@ jobs:
           echo "♟️ Partie détectée: $GAME_ID"
           export GAME_ID
 
-          # 1) Télécharger le PGN brut depuis Lichess
-          RESPONSE=$(curl -s -H "Authorization: Bearer $LICHESS_BOT_TOKEN" \
-            "https://lichess.org/game/export/$GAME_ID?pgn=1&clocks=0&evals=0&literate=0")
+          # Sauvegarder JSON brut (debug/trace)
+          echo "$GAME_JSON" > data/account_playing.json
 
-          if [ -z "$RESPONSE" ]; then
-            echo "❌ Impossible de récupérer le PGN."
-            exit 0
-          fi
+          # Extraire FEN + moves
+          GAME_FEN=$(echo "$GAME_JSON" | jq -r '.nowPlaying[] | select(.gameId=="'"$GAME_ID"'") | .fen')
+          GAME_MOVES=$(echo "$GAME_JSON" | jq -r '.nowPlaying[] | select(.gameId=="'"$GAME_ID"'") | .moves')
 
-          echo "$RESPONSE" > data/game.pgn
-          echo "✅ PGN sauvegardé dans data/game.pgn"
+          echo "$GAME_FEN" > data/position_before_black.fen
+          echo "$GAME_MOVES" > data/moves_before_black.txt
 
           # 2) Script Python pour jouer le coup noir et mettre à jour les fichiers
           cat > play_move.py <<'PY'
-          import os, json, shutil, chess.pgn, chess.engine, requests
+          import os, json, shutil, chess, chess.engine, requests
           from pathlib import Path
           from datetime import datetime, timezone
 
+          data_dir = Path("data")
           game_id = os.environ["GAME_ID"]
           elo = int(os.environ.get("BOT_ELO", 1500))
           token = os.environ["LICHESS_BOT_TOKEN"]
 
-          # Sauvegarder l'Elo dans un fichier pour la miniature
-          Path("data/bot_elo.txt").write_text(str(elo), encoding="utf-8")
+          # Sauvegarder Elo
+          (data_dir / "bot_elo.txt").write_text(str(elo), encoding="utf-8")
 
-          # Lire le PGN et reconstruire la position
-          with open("data/game.pgn", "r", encoding="utf-8") as f:
-              game = chess.pgn.read_game(f)
+          # Lire FEN et moves
+          fen_path = data_dir / "position_before_black.fen"
+          moves_path = data_dir / "moves_before_black.txt"
+          fen = fen_path.read_text(encoding="utf-8").strip()
+          moves = moves_path.read_text(encoding="utf-8").strip().split()
 
-          if not game:
-              print("❌ Impossible de parser le PGN")
-              exit(0)
+          board = chess.Board(fen)
 
-          board = game.board()
-          moves_list = []
-          for move in game.mainline_moves():
-              san = board.san(move)
-              moves_list.append(san)
-              board.push(move)
+          print("📜 Historique des coups (UCI):", " ".join(moves))
+          print("FEN serveur:", fen)
 
-          print("📜 Historique des coups :", " ".join(moves_list))
-
-          # Vérifier si la partie est finie
           if board.is_game_over():
               print("⚠️ Partie terminée, aucun coup joué.")
               exit(0)
 
-          # Vérifier si c'est bien aux Noirs de jouer
           if board.turn != chess.BLACK:
               print("⚠️ Ce n'est pas aux Noirs de jouer.")
               exit(0)
 
-          # Trouver le binaire Stockfish
+          # Choix du coup via Stockfish
           stockfish_path = shutil.which("stockfish")
           if not stockfish_path:
               print("❌ Stockfish introuvable")
               exit(0)
 
-          # Calculer le coup noir
           engine = chess.engine.SimpleEngine.popen_uci(stockfish_path)
           engine.configure({"UCI_LimitStrength": True, "UCI_Elo": elo})
           result = engine.play(board, chess.engine.Limit(time=1.0))
@@ -118,23 +107,21 @@ jobs:
           engine.quit()
 
           print(f"🤖 Coup choisi: {move.uci()}")
-
-          # Appliquer le coup sur le plateau
           board.push(move)
 
-          # Envoyer le coup à Lichess (Bot API)
+          # Envoi à Lichess
           url = f"https://lichess.org/api/bot/game/{game_id}/move/{move.uci()}"
           headers = {"Authorization": f"Bearer {token}"}
           r = requests.post(url, headers=headers)
           print(f"📤 POST {url} -> {r.status_code} {r.text}")
           if r.status_code != 200:
-              exit(0)
+              exit(1)
 
-          # Sauvegarder la position mise à jour
+          # Sauvegarde FEN après coup
           fen_after = board.fen()
-          Path("data/position.fen").write_text(fen_after, encoding="utf-8")
+          (data_dir / "position.fen").write_text(fen_after, encoding="utf-8")
 
-          Path("data/dernier_coup.json").write_text(
+          (data_dir / "dernier_coup.json").write_text(
               json.dumps({
                   "dernier_coup": move.uci(),
                   "fen": fen_after,
@@ -143,7 +130,7 @@ jobs:
               encoding="utf-8"
           )
 
-          history_file = Path("data/move_history.json")
+          history_file = data_dir / "move_history.json"
           history = []
           if history_file.exists():
               try:
@@ -165,7 +152,7 @@ jobs:
 
           python3 play_move.py
 
-      # 4) Commit & push avec rebase pour éviter les conflits
+      # 4) Commit & push avec rebase
       - name: Commit updated files
         run: |
           git config user.name "github-actions"
