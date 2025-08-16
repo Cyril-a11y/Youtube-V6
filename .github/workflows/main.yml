@@ -90,9 +90,20 @@ jobs:
         run: python 05_play_black.py
         continue-on-error: true
 
-      # 13) Delay after black move
-      - name: Delay after black move
-        run: sleep 1
+      # 13) Wait for Run Bot workflow (max 120s)
+      - name: Wait for Run Bot workflow
+        run: |
+          echo "⏳ Attente de la fin du workflow Run Bot (max 120s)..."
+          for i in {1..24}; do
+            STATUS=$(curl -s -H "Authorization: Bearer ${{ secrets.GH_WORKFLOW_TOKEN }}" \
+              https://api.github.com/repos/Cyril-a11y/Youtube-V6/actions/workflows/run_bot.yml/runs?branch=main \
+              | jq -r '.workflow_runs[0].status')
+            echo "Statut: $STATUS"
+            if [ "$STATUS" = "completed" ]; then
+              break
+            fi
+            sleep 5
+          done
 
       # 14) Commit updated game data
       - name: Commit updated game data
