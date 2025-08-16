@@ -1,9 +1,6 @@
 import os
 import json
-import re
-import io
 import chess
-import chess.pgn
 import chess.svg
 import requests
 from pathlib import Path
@@ -13,7 +10,6 @@ from wand.color import Color
 DATA_DIR = Path("data")
 SVG_FILE = DATA_DIR / "thumbnail_black.svg"
 PNG_FILE = DATA_DIR / "thumbnail_black.png"
-PGN_FILE = DATA_DIR / "game.pgn"
 BOT_ELO_FILE = DATA_DIR / "bot_elo.txt"
 
 # --- Lecture Elo ---
@@ -25,61 +21,50 @@ except Exception:
 NOM_BLANCS = "Communauté PriseEnPassant"
 NOM_NOIRS = f"Stockfish {ELO_APPROX} Elo"
 
-# --- Récupération du PGN via /api/account/playing ---
-print("📥 Récupération du PGN en cours…")
+# --- API account/playing ---
+print("📥 Récupération de l'état de la partie en cours (live)…")
 token = os.getenv("LICHESS_BOT_TOKEN")
 if not token:
     print("❌ LICHESS_BOT_TOKEN manquant.")
     exit(1)
 
-# Trouver la partie courante
-r = requests.get("https://lichess.org/api/account/playing",
-                 headers={"Authorization": f"Bearer {token}"}, timeout=10)
-if r.status_code != 200:
-    print(f"❌ Erreur Lichess account/playing: {r.status_code} {r.text[:200]}")
+url = "https://lichess.org/api/account/playing"
+resp = requests.get(url, headers={"Authorization": f"Bearer {token}"}, timeout=10)
+if resp.status_code != 200:
+    print(f"❌ Erreur Lichess account/playing: {resp.status_code} {resp.text[:200]}")
     exit(1)
 
-data = r.json()
+data = resp.json()
 games = data.get("nowPlaying", [])
 if not games:
     print("⚠️ Aucune partie en cours trouvée.")
     exit(0)
 
-# On prend la 1ère partie active
-game_id = games[0]["gameId"]
+# On prend la 1ère partie
+g = games[0]
+game_id = g["gameId"]
+fen = g["fen"]
+moves = g.get("moves", "").split()  # historique en UCI
+last_move = g.get("lastMove")
 
-# Télécharger le PGN + FEN serveur
-url = f"https://lichess.org/game/export/{game_id}?pgn=1&fen=1&moves=1&clocks=0&evals=0&literate=0"
-resp = requests.get(url, headers={"Authorization": f"Bearer {token}"}, timeout=10)
-if resp.status_code != 200:
-    print(f"❌ Erreur téléchargement PGN: {resp.status_code} {resp.text[:200]}")
-    exit(1)
-
-pgn_text = resp.text
-PGN_FILE.write_text(pgn_text, encoding="utf-8")
-print(f"✅ PGN sauvegardé dans {PGN_FILE}")
+print(f"♟️ Partie détectée: {game_id}")
+print("FEN actuelle:", fen)
+print("Dernier coup:", last_move)
+print("Nb coups joués:", len(moves))
 
 # --- Reconstruction échiquier ---
-game = chess.pgn.read_game(io.StringIO(pgn_text))
-if not game:
-    print("❌ Impossible de parser le PGN.")
-    exit(1)
+board = chess.Board(fen)
 
-board = game.board()
+# Convertir les coups UCI en SAN pour l'historique
 moves_list = []
-for move in game.mainline_moves():
-    moves_list.append(board.san(move))
-    board.push(move)
+tmp_board = chess.Board()
+for uci in moves:
+    mv = chess.Move.from_uci(uci)
+    san = tmp_board.san(mv)
+    moves_list.append(san)
+    tmp_board.push(mv)
 
 last_san = moves_list[-1] if moves_list else "?"
-
-# 🔑 Vérification avec FEN serveur
-fen_match = re.search(r'\[FEN "(.*?)"\]', pgn_text)
-if fen_match:
-    fen_serveur = fen_match.group(1)
-    if board.fen() != fen_serveur:
-        print(f"⚠️ Décalage détecté : PGN={board.fen()} vs serveur={fen_serveur}")
-        board = chess.Board(fen_serveur)
 
 # --- Historique en colonnes ---
 def format_history_lines(moves):
