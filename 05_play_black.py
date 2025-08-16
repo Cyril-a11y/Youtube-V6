@@ -34,11 +34,10 @@ def get_current_game_bot():
         return None
 
     for g in games:
-        log(f"🎯 Partie détectée: {g.get('gameId')} | trait: {g.get('fen')} | isMyTurn={g.get('isMyTurn')} | couleur={g.get('color')}")
+        log(f"🎯 Partie détectée: {g.get('gameId')} | trait: {g.get('fen')} | "
+            f"isMyTurn={g.get('isMyTurn')} | couleur={g.get('color')}")
         if g.get("isMyTurn") and g.get("color") == "black":
-            return {
-                "fen": g["fen"]
-            }
+            return {"fen": g["fen"]}
 
     log("⚠️ Aucune partie où c'est au bot (noirs) de jouer.")
     return None
@@ -50,7 +49,7 @@ def _gh_headers():
         "X-GitHub-Api-Version": "2022-11-28",
     }
 
-def trigger_bot_workflow(elo: str = "1500"):
+def trigger_bot_workflow(elo: str):
     if not GITHUB_TOKEN:
         log("Pas de GH_WORKFLOW_TOKEN défini.", "❌")
         return False
@@ -78,13 +77,15 @@ if __name__ == "__main__":
         log("ℹ️ Ce n'est pas aux Noirs de jouer — arrêt.")
         raise SystemExit(0)
 
-    # Lire Elo depuis le fichier bot_elo.txt (sinon fallback 1500)
-    try:
-        BOT_ELO = BOT_ELO_FILE.read_text(encoding="utf-8").strip()
-        if not BOT_ELO.isdigit():
-            BOT_ELO = "1500"
-    except Exception:
-        BOT_ELO = "1500"
+    # Lire Elo depuis le fichier bot_elo.txt (obligatoire)
+    if not BOT_ELO_FILE.exists():
+        log("❌ Fichier bot_elo.txt introuvable — le workflow doit l'écrire.", "❌")
+        raise SystemExit(1)
 
-    log(f"Elo actuel choisi : {BOT_ELO}")
+    BOT_ELO = BOT_ELO_FILE.read_text(encoding="utf-8").strip()
+    if not BOT_ELO.isdigit():
+        log("❌ Contenu de bot_elo.txt invalide.", "❌")
+        raise SystemExit(1)
+
+    log(f"Elo actuel choisi (depuis bot_elo.txt): {BOT_ELO}")
     trigger_bot_workflow(elo=BOT_ELO)
