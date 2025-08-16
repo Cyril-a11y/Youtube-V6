@@ -7,12 +7,17 @@ from pathlib import Path
 from wand.image import Image
 from wand.color import Color
 
+# -----------------------
+# Fichiers et chemins
+# -----------------------
 DATA_DIR = Path("data")
 SVG_FILE = DATA_DIR / "thumbnail_black.svg"
 PNG_FILE = DATA_DIR / "thumbnail_black.png"
 BOT_ELO_FILE = DATA_DIR / "bot_elo.txt"
 
-# --- Lecture Elo ---
+# -----------------------
+# Lecture Elo du bot (pour affichage Stockfish)
+# -----------------------
 try:
     ELO_APPROX = int(BOT_ELO_FILE.read_text(encoding="utf-8").strip())
 except Exception:
@@ -21,7 +26,9 @@ except Exception:
 NOM_BLANCS = "Communauté PriseEnPassant"
 NOM_NOIRS = f"Stockfish {ELO_APPROX} Elo"
 
-# --- API account/playing ---
+# -----------------------
+# Récupération de la partie en cours via API account/playing
+# -----------------------
 print("📥 Récupération de l'état de la partie en cours (live)…")
 token = os.getenv("LICHESS_BOT_TOKEN")
 if not token:
@@ -40,7 +47,7 @@ if not games:
     print("⚠️ Aucune partie en cours trouvée.")
     exit(0)
 
-# On prend la 1ère partie
+# On prend la 1ère partie active
 g = games[0]
 game_id = g["gameId"]
 fen = g["fen"]
@@ -52,10 +59,12 @@ print("FEN actuelle:", fen)
 print("Dernier coup:", last_move)
 print("Nb coups joués:", len(moves))
 
-# --- Reconstruction échiquier ---
+# -----------------------
+# Reconstruction échiquier
+# -----------------------
 board = chess.Board(fen)
 
-# Convertir les coups UCI en SAN pour l'historique
+# Convertir l'historique UCI en SAN pour affichage lisible
 moves_list = []
 tmp_board = chess.Board()
 for uci in moves:
@@ -66,14 +75,16 @@ for uci in moves:
 
 last_san = moves_list[-1] if moves_list else "?"
 
-# --- Historique en colonnes ---
+# -----------------------
+# Mise en forme historique (retour à la ligne toutes les 4 paires de coups)
+# -----------------------
 def format_history_lines(moves):
     lignes = []
-    for i in range(0, len(moves), 8):
+    for i in range(0, len(moves), 8):  # 8 = 4 tours (blanc+noir)
         bloc = moves[i:i+8]
         bloc_num = []
         for j, coup in enumerate(bloc):
-            if j % 2 == 0:
+            if j % 2 == 0:  # numérotation des tours
                 tour_num = (i + j) // 2 + 1
                 bloc_num.append(f'<tspan fill="red" font-weight="bold">{tour_num}.</tspan> {coup}')
             else:
@@ -83,7 +94,9 @@ def format_history_lines(moves):
 
 historique_lignes = format_history_lines(moves_list)
 
-# --- SVG échiquier ---
+# -----------------------
+# Génération échiquier SVG (plateau seul)
+# -----------------------
 svg_echiquier = chess.svg.board(
     board=board,
     orientation=chess.WHITE,
@@ -91,10 +104,16 @@ svg_echiquier = chess.svg.board(
     lastmove=board.peek() if board.move_stack else None
 )
 
-# --- Construction SVG complet ---
+# -----------------------
+# Construction SVG final avec :
+#  - fond clair
+#  - échiquier à gauche
+#  - infos partie à droite
+#  - historique des coups dans une boîte arrondie
+# -----------------------
 historique_svg = ""
 for i, ligne in enumerate(historique_lignes):
-    y = 375 + i * 34
+    y = 400 + i * 34
     historique_svg += f"""
     <text x="700" y="{y}" font-size="22" font-family="Ubuntu" fill="#333">
         {ligne}
@@ -103,24 +122,43 @@ for i, ligne in enumerate(historique_lignes):
 tour = (len(moves_list) // 2) + 1
 
 svg_final = f"""<svg width="1280" height="720" xmlns="http://www.w3.org/2000/svg">
+  <!-- Fond -->
   <rect width="100%" height="100%" fill="#f9fafb"/>
+
+  <!-- Échiquier -->
   <g transform="translate(40,50)">
     {svg_echiquier}
   </g>
-  <text x="700" y="180" font-size="28" font-family="Ubuntu" fill="#111">
+
+  <!-- Titre -->
+  <text x="700" y="80" font-size="32" font-family="Ubuntu" font-weight="bold" fill="#111">
+    Partie en cours : {NOM_BLANCS} vs {NOM_NOIRS}
+  </text>
+
+  <!-- FEN (debug optionnel) -->
+  <text x="700" y="130" font-size="20" font-family="Ubuntu" fill="#777">
+    FEN : {fen}
+  </text>
+
+  <!-- Infos partie -->
+  <text x="700" y="180" font-size="26" font-family="Ubuntu" fill="#111">
     Dernier coup : {last_san}
   </text>
-  <text x="700" y="280" font-size="24" font-family="Ubuntu" fill="#555">
+  <text x="700" y="220" font-size="22" font-family="Ubuntu" fill="#555">
     🕒 Tour : {tour}
   </text>
-  <rect x="680" y="295" width="540" height="340" fill="#fff" stroke="#d1d5db" stroke-width="1" rx="8" ry="8"/>
+
+  <!-- Boîte historique -->
+  <rect x="680" y="260" width="560" height="400" fill="#fff" stroke="#d1d5db" stroke-width="1" rx="12" ry="12"/>
   {historique_svg}
 </svg>"""
 
 SVG_FILE.write_text(svg_final, encoding="utf-8")
 print(f"✅ SVG généré : {SVG_FILE}")
 
-# --- Conversion PNG robuste ---
+# -----------------------
+# Conversion PNG avec Wand
+# -----------------------
 try:
     with Image(filename=str(SVG_FILE), resolution=144) as img:
         img.format = 'png'
