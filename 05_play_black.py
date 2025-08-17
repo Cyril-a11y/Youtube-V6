@@ -52,15 +52,24 @@ def _gh_headers():
         "X-GitHub-Api-Version": "2022-11-28",
     }
 
-def trigger_bot_workflow():
+def trigger_bot_workflow(elo: int, mode="uci", depth=None):
+    """Déclenche le workflow GitHub Actions pour jouer un coup"""
     if not GITHUB_TOKEN:
         log("Pas de GH_WORKFLOW_TOKEN défini.", "❌")
         return False
+
     url = f"https://api.github.com/repos/{REPO}/actions/workflows/{WORKFLOW_FILENAME}/dispatches"
-    payload = {"ref": "main"}  # plus besoin d’input Elo
+    payload = {"ref": "main", "inputs": {"elo": str(elo)}}
+
+    # Ajout mode/params simulés
+    if mode != "uci":
+        payload["inputs"]["mode"] = mode
+        if depth:
+            payload["inputs"]["depth"] = str(depth)
+
     r = requests.post(url, headers=_gh_headers(), json=payload, timeout=20)
     if r.status_code == 204:
-        log(f"✅ Workflow bot déclenché.")
+        log(f"✅ Workflow bot déclenché ({mode}, Elo={elo}{' depth='+str(depth) if depth else ''})")
         return True
     log(f"Erreur dispatch ({r.status_code}): {r.text}", "❌")
     return False
@@ -85,11 +94,8 @@ if __name__ == "__main__":
     if BOT_ELO_FILE.exists():
         try:
             value = BOT_ELO_FILE.read_text(encoding="utf-8").strip()
-            if value.isdigit():
-                BOT_ELO = int(value)
-                log(f"Elo trouvé dans bot_elo.txt: {BOT_ELO}")
-            else:
-                raise ValueError("contenu invalide")
+            BOT_ELO = int(value)
+            log(f"Elo trouvé dans bot_elo.txt: {BOT_ELO}")
         except Exception as e:
             BOT_ELO = DEFAULT_ELO
             BOT_ELO_FILE.write_text(str(BOT_ELO), encoding="utf-8")
@@ -99,4 +105,22 @@ if __name__ == "__main__":
         BOT_ELO_FILE.write_text(str(BOT_ELO), encoding="utf-8")
         log(f"📌 bot_elo.txt créé avec Elo par défaut: {BOT_ELO}")
 
-    trigger_bot_workflow()
+    # Clamp pour éviter toute erreur
+    if BOT_ELO < 0:
+        log(f"⚠️ Elo négatif {BOT_ELO}, corrigé à 0")
+        BOT_ELO = 0
+    if BOT_ELO > 5000:
+        log(f"⚠️ Elo trop haut {BOT_ELO}, clampé à 5000 max interne")
+        BOT_ELO = 5000
+
+    # Détermination du mode
+    if BOT_ELO <= 300:
+        trigger_bot_workflow(elo=1320, mode="random")
+    elif BOT_ELO < 1320:
+        depth = 1 if BOT_ELO < 800 else (2 if BOT_ELO < 1100 else 3)
+        trigger_bot_workflow(elo=1320, mode="depth", depth=depth)
+    elif BOT_ELO > 3190:
+        log(f"⚠️ Elo demandé {BOT_ELO} trop élevé, clampé à 3190.")
+        trigger_bot_workflow(elo=3190, mode="uci")
+    else:
+        trigger_bot_workflow(elo=BOT_ELO, mode="uci")
