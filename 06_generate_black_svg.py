@@ -1,4 +1,4 @@
-# 06_generate_black_svg.py — version corrigée (PNG + historique + dernier coup)
+# 06_generate_black_svg.py — version finale (FEN via account/playing, historique via game/export)
 
 import os
 import re
@@ -62,35 +62,38 @@ if not games:
 g = games[0]
 game_id = g["gameId"]
 fen = g["fen"]
-uci_moves = g.get("moves", "").strip().split()
-if not uci_moves or uci_moves == [""]:
-    uci_moves = []
 
 print(f"♟️ Partie détectée: {game_id}")
 print("FEN actuelle:", fen)
-print("Nb coups joués:", len(uci_moves))
-print("Coups UCI bruts:", uci_moves)
 
-# --- Reconstruction échiquier ---
-# 1) Plateau courant depuis FEN
+# --- Reconstruction échiquier depuis FEN ---
 board = chess.Board(fen)
 
-# 2) Plateau complet reconstruit depuis le début pour obtenir SAN
-tmp_board = chess.Board()  # position initiale standard
+# --- Récupération historique via game/export ---
 moves_list = []
-for uci in uci_moves:
-    try:
-        mv = chess.Move.from_uci(uci)
-        san = tmp_board.san(mv)
-        moves_list.append(san)
-        tmp_board.push(mv)
-    except Exception as e:
-        print(f"⚠️ Erreur sur {uci}: {e}")
-
-print("Historique SAN:", moves_list)
-
-# Dernier coup SAN → affiché seulement si moves_list non vide
-last_san = moves_list[-1] if moves_list else ""
+last_san = ""
+try:
+    export_url = f"https://lichess.org/game/export/{game_id}?moves=1&tags=0&pgnInJson=1"
+    resp_pgn = requests.get(export_url, headers={"Authorization": f"Bearer {token}"}, timeout=10)
+    if resp_pgn.status_code == 200:
+        game_data = resp_pgn.json()
+        pgn_moves = game_data.get("moves", "").strip().split()
+        tmp_board = chess.Board()
+        for uci in pgn_moves:
+            try:
+                mv = chess.Move.from_uci(uci)
+                san = tmp_board.san(mv)
+                moves_list.append(san)
+                tmp_board.push(mv)
+            except Exception as e:
+                print(f"⚠️ Erreur SAN sur {uci}: {e}")
+        if moves_list:
+            last_san = moves_list[-1]
+        print("Historique SAN (via game/export):", moves_list)
+    else:
+        print(f"⚠️ Impossible de récupérer le PGN complet ({resp_pgn.status_code})")
+except Exception as e:
+    print(f"⚠️ Erreur lors du fetch game/export: {e}")
 
 # --- Historique formaté ---
 def format_history_lines(moves):
