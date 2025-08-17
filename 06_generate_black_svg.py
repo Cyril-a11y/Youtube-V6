@@ -135,7 +135,7 @@ svg_echiquier = _force_board_colors(svg_echiquier)
 # --- Construction SVG esthétique complet ---
 historique_svg = ""
 for i, ligne in enumerate(historique_lignes):
-    y = 380 + i * 34
+    y = 360 + i * 34
     historique_svg += f"""
     <text x="700" y="{y}" font-size="15" font-family="Ubuntu" fill="#333">
         {ligne}
