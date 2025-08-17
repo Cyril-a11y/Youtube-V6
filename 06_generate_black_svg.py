@@ -1,4 +1,4 @@
-# 06_generate_black_svg.py — version corrigée (respect strict règle Elo)
+# 06_generate_black_svg.py — version corrigée (PNG + historique + dernier coup)
 
 import os
 import re
@@ -6,8 +6,7 @@ import chess
 import requests
 import chess.svg
 from pathlib import Path
-from wand.image import Image
-from wand.color import Color
+import cairosvg   # ✅ rendu SVG → PNG plus fiable
 
 # --- Fichiers ---
 DATA_DIR = Path("data")
@@ -63,12 +62,14 @@ if not games:
 g = games[0]
 game_id = g["gameId"]
 fen = g["fen"]
-uci_moves = g.get("moves", "").split()
-last_move = g.get("lastMove")
+uci_moves = g.get("moves", "").strip().split()
+if not uci_moves or uci_moves == [""]:
+    uci_moves = []
+last_move_uci = g.get("lastMove")
 
 print(f"♟️ Partie détectée: {game_id}")
 print("FEN actuelle:", fen)
-print("Dernier coup UCI:", last_move)
+print("Dernier coup UCI:", last_move_uci)
 print("Nb coups joués:", len(uci_moves))
 print("Coups UCI bruts:", uci_moves)
 
@@ -89,7 +90,18 @@ for uci in uci_moves:
         print(f"⚠️ Erreur sur {uci}: {e}")
 
 print("Historique SAN:", moves_list)
-last_san = moves_list[-1] if moves_list else "?"
+
+# Dernier coup SAN → si vide, fallback sur lastMove UCI
+if moves_list:
+    last_san = moves_list[-1]
+elif last_move_uci:
+    try:
+        mv = chess.Move.from_uci(last_move_uci)
+        last_san = chess.Board().san(mv)  # best effort (depuis position initiale)
+    except Exception:
+        last_san = last_move_uci
+else:
+    last_san = "?"
 
 # --- Historique formaté ---
 def format_history_lines(moves):
@@ -192,12 +204,7 @@ print(f"✅ SVG généré : {SVG_FILE}")
 
 # --- Conversion PNG robuste ---
 try:
-    with Image(blob=SVG_FILE.read_bytes(), format="svg") as img:
-        img.background_color = Color("white")
-        img.alpha_channel = "remove"
-        img.resize(1280, 720)  # taille fixée
-        img.format = "png"
-        img.save(filename=str(PNG_FILE))
+    cairosvg.svg2png(bytestring=svg_final.encode("utf-8"), write_to=str(PNG_FILE))
     print(f"✅ PNG miniature générée : {PNG_FILE}")
 except Exception as e:
     print(f"❌ Erreur conversion PNG: {e}")
