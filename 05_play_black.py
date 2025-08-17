@@ -11,7 +11,7 @@ GITHUB_TOKEN = os.getenv("GH_WORKFLOW_TOKEN")
 LICHESS_BOT_TOKEN = os.getenv("LICHESS_BOT_TOKEN")
 BOT_ELO_FILE = Path("data/bot_elo.txt")
 
-# Elo par défaut (si fichier absent ou corrompu)
+# Elo par défaut si fichier absent/corrompu
 DEFAULT_ELO = 1300
 
 def log(msg, tag="ℹ️"):
@@ -61,7 +61,6 @@ def trigger_bot_workflow(elo: int, mode="uci", depth=None):
     url = f"https://api.github.com/repos/{REPO}/actions/workflows/{WORKFLOW_FILENAME}/dispatches"
     payload = {"ref": "main", "inputs": {"elo": str(elo)}}
 
-    # Ajout mode/params simulés
     if mode != "uci":
         payload["inputs"]["mode"] = mode
         if depth:
@@ -89,38 +88,36 @@ if __name__ == "__main__":
         log("ℹ️ Ce n'est pas aux Noirs de jouer — arrêt.")
         raise SystemExit(0)
 
-    # Vérifier ou écrire bot_elo.txt
+    # Lecture du Elo défini par l’utilisateur (sans jamais l’écraser)
     BOT_ELO_FILE.parent.mkdir(parents=True, exist_ok=True)
     if BOT_ELO_FILE.exists():
         try:
-            value = BOT_ELO_FILE.read_text(encoding="utf-8").strip()
-            BOT_ELO = int(value)
-            log(f"Elo trouvé dans bot_elo.txt: {BOT_ELO}")
+            BOT_ELO = int(BOT_ELO_FILE.read_text(encoding="utf-8").strip())
+            log(f"Elo lu dans bot_elo.txt: {BOT_ELO}")
         except Exception as e:
             BOT_ELO = DEFAULT_ELO
-            BOT_ELO_FILE.write_text(str(BOT_ELO), encoding="utf-8")
             log(f"⚠️ Erreur lecture bot_elo.txt ({e}), fallback {BOT_ELO}")
     else:
         BOT_ELO = DEFAULT_ELO
         BOT_ELO_FILE.write_text(str(BOT_ELO), encoding="utf-8")
         log(f"📌 bot_elo.txt créé avec Elo par défaut: {BOT_ELO}")
 
-    # Clamp pour éviter toute erreur
+    # Clamp hard pour éviter toute erreur
     if BOT_ELO < 0:
         log(f"⚠️ Elo négatif {BOT_ELO}, corrigé à 0")
         BOT_ELO = 0
-    if BOT_ELO > 5000:
-        log(f"⚠️ Elo trop haut {BOT_ELO}, clampé à 5000 max interne")
-        BOT_ELO = 5000
+    if BOT_ELO > 3190:
+        log(f"⚠️ Elo demandé {BOT_ELO} trop élevé, clampé à 3190.")
+        BOT_ELO = 3190
 
-    # Détermination du mode
+    # Détermination du mode de jeu
     if BOT_ELO <= 300:
+        # simulation "débutant aléatoire"
         trigger_bot_workflow(elo=1320, mode="random")
     elif BOT_ELO < 1320:
+        # simulation faible via depth
         depth = 1 if BOT_ELO < 800 else (2 if BOT_ELO < 1100 else 3)
         trigger_bot_workflow(elo=1320, mode="depth", depth=depth)
-    elif BOT_ELO > 3190:
-        log(f"⚠️ Elo demandé {BOT_ELO} trop élevé, clampé à 3190.")
-        trigger_bot_workflow(elo=3190, mode="uci")
     else:
+        # Elo normal (1320 → 3190)
         trigger_bot_workflow(elo=BOT_ELO, mode="uci")
