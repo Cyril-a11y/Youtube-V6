@@ -137,7 +137,7 @@ historique_svg = ""
 for i, ligne in enumerate(historique_lignes):
     y = 360 + i * 34
     historique_svg += f"""
-    <text x="690" y="{y}" font-size="15" font-family="Ubuntu" fill="#333">
+    <text x="690" y="{y}" font-size="14" font-family="Ubuntu" fill="#333">
         {ligne}
     </text>"""
 
