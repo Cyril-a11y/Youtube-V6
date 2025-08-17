@@ -96,15 +96,22 @@ def nettoyer_et_corriger_san(commentaire: str) -> str:
     raw = (raw.replace("×", "x").replace("–", "-").replace("—", "-")
                .replace("0-0-0", "O-O-O").replace("o-o-o", "O-O-O")
                .replace("0-0", "O-O").replace("o-o", "O-O"))
+
     txt = _sans_accents(raw.lower())
+
+    # Expressions de roque en toutes lettres
     if re.search(r"grand\s*roque|roque\s*long|cote\s*dame|rochade\s*longue", txt):
         return "O-O-O"
     if re.search(r"petit\s*roque|roque\s*court|cote\s*roi|rochade\s*courte", txt) or re.fullmatch(r"roque", txt):
         return "O-O"
-    trad = {"C": "N", "F": "B", "T": "R", "D": "Q", "R": "K"}
+
+    # Traduction des initiales françaises vers SAN anglais
+    trad = {"P": "", "T": "R", "C": "N", "F": "B", "D": "Q", "R": "K"}
+    if raw and raw[0].upper() in trad:
+        return trad[raw[0].upper()] + raw[1:]
+
+    # Sinon nettoyage basique (mais on conserve les lettres SAN anglaises)
     cleaned = re.sub(r"[^a-hA-H1-8NBRQKx=+#]", "", raw)
-    if cleaned[:1] in trad:
-        cleaned = trad[cleaned[0]] + cleaned[1:]
     return cleaned
 
 def extraire_coups_valides(board, commentaires):
@@ -181,7 +188,6 @@ def fetch_current_board_from_lichess():
         return None, None
 
     g = games[0]  # prend la première partie active
-    moves_str = g.get("moves", "")
     fen = g["fen"]
 
     # État actuel du board depuis FEN
