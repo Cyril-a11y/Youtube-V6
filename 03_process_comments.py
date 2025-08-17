@@ -109,27 +109,42 @@ def nettoyer_et_corriger_san(commentaire: str) -> str:
 
 def extraire_coups_valides(board, commentaires):
     valides = []
+
+    def try_parse(board, token):
+        # Essai direct en SAN
+        try:
+            return board.parse_san(token)
+        except Exception:
+            pass
+
+        # Essai direct en UCI
+        try:
+            mv = chess.Move.from_uci(token.lower())
+            if mv in board.legal_moves:
+                return mv
+        except Exception:
+            pass
+
+        # Fallback : comparer les SAN des coups légaux
+        candidates = []
+        for mv in board.legal_moves:
+            san = board.san(mv)
+            if san.endswith(token[-3:]):  # ex: "xa4"
+                candidates.append(mv)
+
+        if len(candidates) == 1:
+            return candidates[0]
+        return None
+
     for com in commentaires:
         log(f"📝 Commentaire brut : {com}", "info")
         token = nettoyer_et_corriger_san(com)
         log(f"   ↳ Token nettoyé : {token}", "info")
 
-        move = None
-        try:
-            move = board.parse_san(token)
-            log(f"   ✅ Interprété comme SAN : {move.uci()}", "ok")
-        except Exception:
-            try:
-                move = chess.Move.from_uci(token.lower())
-                if move in board.legal_moves:
-                    log(f"   ✅ Interprété comme UCI : {move.uci()}", "ok")
-                else:
-                    log(f"   ❌ UCI non légal : {token}", "warn")
-                    move = None
-            except Exception:
-                log(f"   ❌ Échec parsing SAN/UCI", "warn")
+        move = try_parse(board, token)
 
         if move and move in board.legal_moves:
+            log(f"   ✅ Coup retenu : {board.san(move)} ({move.uci()})", "ok")
             valides.append(move.uci())
         else:
             log(f"   ❌ Coup rejeté : {token}", "warn")
