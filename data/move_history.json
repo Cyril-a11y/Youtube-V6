@@ -118,5 +118,11 @@
     "coup": "a7g7",
     "fen_apres": "rnB1k2r/6qp/ppp2bp1/3pp3/P5Q1/1PP4P/2P2PP1/R3K2R w KQkq - 3 19",
     "horodatage": "2025-08-17T14:37:30.832411+00:00"
+  },
+  {
+    "couleur": "blanc",
+    "coup": "g7h6",
+    "fen_apres": "rnB1k2r/7p/ppp2bpq/3pp3/P5Q1/1PP4P/2P2PP1/R4RK1 w kq - 5 20",
+    "horodatage": "2025-08-17T14:53:45.167863+00:00"
   }
 ]
