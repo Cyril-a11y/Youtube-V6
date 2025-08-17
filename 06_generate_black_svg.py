@@ -99,13 +99,8 @@ try:
 except Exception as e:
     print(f"⚠️ Erreur lors du fetch game/export: {e}")
 
-# --- Dernier coup SAN basé sur FEN live ---
-last_san = ""
-if board.move_stack:
-    try:
-        last_san = board.san(board.peek())
-    except Exception:
-        last_san = moves_list[-1] if moves_list else ""
+# --- Dernier coup SAN basé uniquement sur l'historique ---
+last_san = moves_list[-1] if moves_list else ""
 
 # --- Historique formaté ---
 def format_history_lines(moves):
