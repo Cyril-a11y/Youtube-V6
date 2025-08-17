@@ -1,4 +1,4 @@
-# 06_generate_black_svg.py — version UCI brut via account/playing uniquement
+# 06_generate_black_svg.py — version UCI brut via account/playing uniquement, avec logs bruts
 
 import os
 import re
@@ -7,6 +7,7 @@ import requests
 import chess.svg
 from pathlib import Path
 import cairosvg   # ✅ rendu SVG → PNG plus fiable
+import json
 
 # --- Fichiers ---
 DATA_DIR = Path("data")
@@ -60,6 +61,12 @@ if not games:
 
 # On prend la 1ère partie active
 g = games[0]
+
+# --- Log brut des données de la partie ---
+print("=== Données brutes account/playing ===")
+print(json.dumps(g, indent=2, ensure_ascii=False))
+print("======================================")
+
 game_id = g["gameId"]
 fen = g["fen"]
 
@@ -76,6 +83,7 @@ print("Historique UCI (via account/playing):", moves_list)
 
 # Dernier coup brut (UCI)
 last_move = moves_list[-1] if moves_list else ""
+print("Dernier coup UCI:", last_move)
 
 # --- Historique formaté ---
 def format_history_lines(moves):
