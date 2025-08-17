@@ -111,16 +111,12 @@ def format_history_lines(moves):
             lignes.append(f'<tspan fill="red" font-weight="bold">{num}.</tspan> {bloc[0]}')
         else:
             lignes.append(f'<tspan fill="red" font-weight="bold">{num}.</tspan> {bloc[0]} {bloc[1]}')
-    # retour à la ligne toutes les 2 coups (4 demi-coups)
+    # retour à la ligne toutes les 4 paires de coups (soit 8 demi-coups)
     lignes_split = []
-    for j in range(0, len(lignes), 2):
-        lignes_split.append(" ".join(lignes[j:j+2]))
+    for j in range(0, len(lignes), 4):
+        lignes_split.append(" ".join(lignes[j:j+4]))
     return lignes_split
 
-if not moves_list:
-    historique_lignes = ["(aucun coup pour le moment)"]
-else:
-    historique_lignes = format_history_lines(moves_list)
 
 # --- Génération échiquier SVG ---
 svg_echiquier = chess.svg.board(
