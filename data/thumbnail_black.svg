@@ -43,23 +43,23 @@ R . . . . R K .</pre></desc><defs><g id="white-pawn" class="white pawn"><path d=
     ☰ Historique des coups :
   </text>
   
-    <text x="700" y="370" font-size="18" font-family="Ubuntu" fill="#333">
-        <tspan fill="red" font-weight="bold">1.</tspan> e4 Nf6 <tspan fill="red" font-weight="bold">2.</tspan> Nc3 g6 <tspan fill="red" font-weight="bold">3.</tspan> a3 Bg7 <tspan fill="red" font-weight="bold">4.</tspan> Nf3 d5
+    <text x="700" y="370" font-size="16" font-family="Ubuntu" fill="#333">
+        <tspan fill="red">1.</tspan> e4 Nf6 <tspan fill="red">2.</tspan> Nc3 g6 <tspan fill="red">3.</tspan> a3 Bg7 <tspan fill="red">4.</tspan> Nf3 d5
     </text>
-    <text x="700" y="404" font-size="18" font-family="Ubuntu" fill="#333">
-        <tspan fill="red" font-weight="bold">5.</tspan> h3 Nxe4 <tspan fill="red" font-weight="bold">6.</tspan> b3 Nxc3 <tspan fill="red" font-weight="bold">7.</tspan> dxc3 Qd6 <tspan fill="red" font-weight="bold">8.</tspan> Nd4 e5
+    <text x="700" y="404" font-size="16" font-family="Ubuntu" fill="#333">
+        <tspan fill="red">5.</tspan> h3 Nxe4 <tspan fill="red">6.</tspan> b3 Nxc3 <tspan fill="red">7.</tspan> dxc3 Qd6 <tspan fill="red">8.</tspan> Nd4 e5
     </text>
-    <text x="700" y="438" font-size="18" font-family="Ubuntu" fill="#333">
-        <tspan fill="red" font-weight="bold">9.</tspan> Nb5 Qe7 <tspan fill="red" font-weight="bold">10.</tspan> Bg5 f6 <tspan fill="red" font-weight="bold">11.</tspan> Bh4 c6 <tspan fill="red" font-weight="bold">12.</tspan> a4 a6
+    <text x="700" y="438" font-size="16" font-family="Ubuntu" fill="#333">
+        <tspan fill="red">9.</tspan> Nb5 Qe7 <tspan fill="red">10.</tspan> Bg5 f6 <tspan fill="red">11.</tspan> Bh4 c6 <tspan fill="red">12.</tspan> a4 a6
     </text>
-    <text x="700" y="472" font-size="18" font-family="Ubuntu" fill="#333">
-        <tspan fill="red" font-weight="bold">13.</tspan> Bxf6 Bxf6 <tspan fill="red" font-weight="bold">14.</tspan> Nc7+ Qxc7 <tspan fill="red" font-weight="bold">15.</tspan> Be2 b6 <tspan fill="red" font-weight="bold">16.</tspan> Bg4 Qe7
+    <text x="700" y="472" font-size="16" font-family="Ubuntu" fill="#333">
+        <tspan fill="red">13.</tspan> Bxf6 Bxf6 <tspan fill="red">14.</tspan> Nc7+ Qxc7 <tspan fill="red">15.</tspan> Be2 b6 <tspan fill="red">16.</tspan> Bg4 Qe7
     </text>
-    <text x="700" y="506" font-size="18" font-family="Ubuntu" fill="#333">
-        <tspan fill="red" font-weight="bold">17.</tspan> Bxc8 Qa7 <tspan fill="red" font-weight="bold">18.</tspan> Qg4 Qg7 <tspan fill="red" font-weight="bold">19.</tspan> O-O Qh6 <tspan fill="red" font-weight="bold">20.</tspan> Qe6+ Kd8
+    <text x="700" y="506" font-size="16" font-family="Ubuntu" fill="#333">
+        <tspan fill="red">17.</tspan> Bxc8 Qa7 <tspan fill="red">18.</tspan> Qg4 Qg7 <tspan fill="red">19.</tspan> O-O Qh6 <tspan fill="red">20.</tspan> Qe6+ Kd8
     </text>
-    <text x="700" y="540" font-size="18" font-family="Ubuntu" fill="#333">
-        <tspan fill="red" font-weight="bold">21.</tspan> Qxf6+ Kxc8 <tspan fill="red" font-weight="bold">22.</tspan> Qxh8+
+    <text x="700" y="540" font-size="16" font-family="Ubuntu" fill="#333">
+        <tspan fill="red">21.</tspan> Qxf6+ Kxc8 <tspan fill="red">22.</tspan> Qxh8+
     </text>
 
   <!-- Fin de partie -->
