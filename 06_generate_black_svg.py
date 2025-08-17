@@ -1,4 +1,4 @@
-# 06_generate_black_svg.py — version finale propre
+# 06_generate_black_svg.py — version finale avec icônes compatibles PNG
 # FEN via account/playing, historique via game/export, vainqueur si terminé
 
 import os
@@ -185,16 +185,16 @@ svg_final = f"""<?xml version="1.0" encoding="UTF-8" standalone="no"?>
     Dernier coup : {last_san}
   </text>
   <text x="700" y="230" font-size="28" font-family="Ubuntu" fill="#111">
-    🧠 Choisissez le prochain coup !
+    ➤ Choisissez le prochain coup !
   </text>
   <text x="700" y="280" font-size="22" font-family="Ubuntu" fill="#555">
-    🕒 Tour : {tour}
+    ⌛ Tour : {tour}
   </text>
 
   <!-- Historique -->
   <rect x="680" y="295" width="540" height="340" fill="#fff" stroke="#d1d5db" stroke-width="1" rx="8" ry="8"/>
   <text x="700" y="330" font-size="24" font-family="Ubuntu" fill="#1f2937" font-weight="bold">
-    📜 Historique des coups :
+    ☰ Historique des coups :
   </text>
   {historique_svg}
 
