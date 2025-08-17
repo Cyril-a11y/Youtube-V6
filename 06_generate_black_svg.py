@@ -1,4 +1,5 @@
-# 06_generate_black_svg.py — version finale (FEN via account/playing, historique via game/export)
+# 06_generate_black_svg.py — version finale propre
+# FEN via account/playing, historique via game/export, vainqueur si terminé
 
 import os
 import re
@@ -72,11 +73,20 @@ board = chess.Board(fen)
 # --- Récupération historique via game/export ---
 moves_list = []
 last_san = ""
+game_status = "ongoing"
+winner = None
+
 try:
     export_url = f"https://lichess.org/game/export/{game_id}?moves=1&tags=0&pgnInJson=1"
-    resp_pgn = requests.get(export_url, headers={"Authorization": f"Bearer {token}"}, timeout=10)
+    resp_pgn = requests.get(
+        export_url,
+        headers={"Authorization": f"Bearer {token}", "Accept": "application/json"},  # ✅ fix
+        timeout=10
+    )
     if resp_pgn.status_code == 200:
         game_data = resp_pgn.json()
+
+        # --- Historique des coups ---
         pgn_moves = game_data.get("moves", "").strip().split()
         tmp_board = chess.Board()
         for uci in pgn_moves:
@@ -90,6 +100,11 @@ try:
         if moves_list:
             last_san = moves_list[-1]
         print("Historique SAN (via game/export):", moves_list)
+
+        # --- Vérifier si partie terminée ---
+        if game_data.get("status") != "started":
+            game_status = game_data.get("status")
+            winner = game_data.get("winner")  # "white" | "black" | None
     else:
         print(f"⚠️ Impossible de récupérer le PGN complet ({resp_pgn.status_code})")
 except Exception as e:
@@ -137,6 +152,16 @@ for i, ligne in enumerate(historique_lignes):
 # numéro du tour basé sur moves_list (correct)
 tour = (len(moves_list) // 2) + 1
 
+# --- Message fin de partie ---
+end_text = ""
+if game_status != "ongoing":
+    if winner == "white":
+        end_text = f"✅ Partie terminée — Vainqueur : {NOM_BLANCS}"
+    elif winner == "black":
+        end_text = f"✅ Partie terminée — Vainqueur : {NOM_NOIRS}"
+    else:
+        end_text = f"🤝 Partie terminée — Résultat : {game_status}"
+
 svg_final = f"""<?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <svg width="1280" height="720" xmlns="http://www.w3.org/2000/svg">
   <!-- Fond général -->
@@ -176,8 +201,13 @@ svg_final = f"""<?xml version="1.0" encoding="UTF-8" standalone="no"?>
   </text>
   {historique_svg}
 
+  <!-- Fin de partie -->
+  <text x="700" y="660" font-size="28" font-family="Ubuntu" fill="#dc2626" font-weight="bold">
+    {end_text}
+  </text>
+
   <!-- Footer -->
-  <text x="750" y="675" font-size="25" font-family="Ubuntu" fill="#1f2937" font-weight="bold">
+  <text x="750" y="700" font-size="25" font-family="Ubuntu" fill="#1f2937" font-weight="bold">
     Chaîne YOUTUBE : PriseEnPassant
   </text>
 
