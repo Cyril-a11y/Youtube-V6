@@ -167,10 +167,7 @@ def sauvegarder_coup_blanc(coup, horodatage):
         {"horodatage": horodatage.isoformat()},
         ensure_ascii=False, indent=2
     ), encoding="utf-8")
-    if coup:
-        log(f"coup_blanc.txt mis à jour: '{coup}'", "save")
-    else:
-        log("Aucun coup valide trouvé", "warn")
+    log(f"coup_blanc.txt mis à jour: '{coup}'", "save")
 
 def fetch_current_board_from_lichess():
     """Récupère l'état de la partie en cours via /api/account/playing"""
@@ -207,20 +204,25 @@ if __name__ == "__main__":
     dernier_coup_time = charger_horodatage_dernier_coup()
     commentaires = recuperer_commentaires(YOUTUBE_VIDEO_ID, apres=dernier_coup_time)
     if not commentaires:
-        sauvegarder_coup_blanc(None, dernier_coup_time)
+        log("Aucun commentaire reçu → on ne fait rien", "warn")
         sys.exit(0)
 
     game_id = load_game_id()
     if not game_id:
-        sauvegarder_coup_blanc(None, dernier_coup_time)
         sys.exit(0)
 
     board, last_move_time = fetch_current_board_from_lichess()
     if not board:
-        sauvegarder_coup_blanc(None, dernier_coup_time)
         sys.exit(0)
 
     coups_valides = extraire_coups_valides(board, commentaires)
     coup_choisi = choisir_coup_majoritaire(coups_valides)
-    sauvegarder_coup_blanc(coup_choisi, last_move_time or datetime.now(tz=timezone.utc))
+
+    if coup_choisi:
+        # ✅ Met à jour uniquement si coup valide
+        sauvegarder_coup_blanc(coup_choisi, last_move_time or datetime.now(tz=timezone.utc))
+    else:
+        # ⚠️ Ne change rien à dernier_coup.json
+        log("Aucun coup valide trouvé → horodatage conservé", "warn")
+
     log("=== FIN DU SCRIPT ===", "info")
