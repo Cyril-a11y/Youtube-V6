@@ -11,6 +11,9 @@ GITHUB_TOKEN = os.getenv("GH_WORKFLOW_TOKEN")
 LICHESS_BOT_TOKEN = os.getenv("LICHESS_BOT_TOKEN")
 BOT_ELO_FILE = Path("data/bot_elo.txt")
 
+# Elo par défaut (si fichier absent ou corrompu)
+DEFAULT_ELO = 1750
+
 def log(msg, tag="ℹ️"):
     print(f"{tag} {msg}")
 
@@ -49,15 +52,15 @@ def _gh_headers():
         "X-GitHub-Api-Version": "2022-11-28",
     }
 
-def trigger_bot_workflow(elo: str):
+def trigger_bot_workflow():
     if not GITHUB_TOKEN:
         log("Pas de GH_WORKFLOW_TOKEN défini.", "❌")
         return False
     url = f"https://api.github.com/repos/{REPO}/actions/workflows/{WORKFLOW_FILENAME}/dispatches"
-    payload = {"ref": "main", "inputs": {"elo": elo}}
+    payload = {"ref": "main"}  # plus besoin d’input Elo
     r = requests.post(url, headers=_gh_headers(), json=payload, timeout=20)
     if r.status_code == 204:
-        log(f"✅ Workflow bot déclenché avec Elo={elo}.")
+        log(f"✅ Workflow bot déclenché.")
         return True
     log(f"Erreur dispatch ({r.status_code}): {r.text}", "❌")
     return False
@@ -77,15 +80,23 @@ if __name__ == "__main__":
         log("ℹ️ Ce n'est pas aux Noirs de jouer — arrêt.")
         raise SystemExit(0)
 
-    # Lire Elo depuis le fichier bot_elo.txt (obligatoire)
-    if not BOT_ELO_FILE.exists():
-        log("❌ Fichier bot_elo.txt introuvable — le workflow doit l'écrire.", "❌")
-        raise SystemExit(1)
+    # Vérifier ou écrire bot_elo.txt
+    BOT_ELO_FILE.parent.mkdir(parents=True, exist_ok=True)
+    if BOT_ELO_FILE.exists():
+        try:
+            value = BOT_ELO_FILE.read_text(encoding="utf-8").strip()
+            if value.isdigit():
+                BOT_ELO = int(value)
+                log(f"Elo trouvé dans bot_elo.txt: {BOT_ELO}")
+            else:
+                raise ValueError("contenu invalide")
+        except Exception as e:
+            BOT_ELO = DEFAULT_ELO
+            BOT_ELO_FILE.write_text(str(BOT_ELO), encoding="utf-8")
+            log(f"⚠️ Erreur lecture bot_elo.txt ({e}), fallback {BOT_ELO}")
+    else:
+        BOT_ELO = DEFAULT_ELO
+        BOT_ELO_FILE.write_text(str(BOT_ELO), encoding="utf-8")
+        log(f"📌 bot_elo.txt créé avec Elo par défaut: {BOT_ELO}")
 
-    BOT_ELO = BOT_ELO_FILE.read_text(encoding="utf-8").strip()
-    if not BOT_ELO.isdigit():
-        log("❌ Contenu de bot_elo.txt invalide.", "❌")
-        raise SystemExit(1)
-
-    log(f"Elo actuel choisi (depuis bot_elo.txt): {BOT_ELO}")
-    trigger_bot_workflow(elo=BOT_ELO)
+    trigger_bot_workflow()
