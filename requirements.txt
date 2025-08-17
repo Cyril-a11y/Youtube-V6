@@ -3,3 +3,5 @@ requests
 google-api-python-client
 python-dotenv
 wand
+chess
+cairosvg
