@@ -65,11 +65,9 @@ fen = g["fen"]
 uci_moves = g.get("moves", "").strip().split()
 if not uci_moves or uci_moves == [""]:
     uci_moves = []
-last_move_uci = g.get("lastMove")
 
 print(f"♟️ Partie détectée: {game_id}")
 print("FEN actuelle:", fen)
-print("Dernier coup UCI:", last_move_uci)
 print("Nb coups joués:", len(uci_moves))
 print("Coups UCI bruts:", uci_moves)
 
@@ -91,17 +89,8 @@ for uci in uci_moves:
 
 print("Historique SAN:", moves_list)
 
-# Dernier coup SAN → si vide, fallback sur lastMove UCI
-if moves_list:
-    last_san = moves_list[-1]
-elif last_move_uci:
-    try:
-        mv = chess.Move.from_uci(last_move_uci)
-        last_san = chess.Board().san(mv)  # best effort (depuis position initiale)
-    except Exception:
-        last_san = last_move_uci
-else:
-    last_san = "?"
+# Dernier coup SAN → affiché seulement si moves_list non vide
+last_san = moves_list[-1] if moves_list else ""
 
 # --- Historique formaté ---
 def format_history_lines(moves):
