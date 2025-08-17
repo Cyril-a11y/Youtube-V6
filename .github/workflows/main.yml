@@ -115,6 +115,12 @@ jobs:
           git diff --cached --quiet || git commit -m "Update game state after moves [skip ci]"
           git push --force-with-lease origin main || true
 
+      # 14bis) Delay to ensure black move is fully registered
+      - name: Delay before generating SVG
+        run: |
+          echo "⏳ Pause 60s pour s'assurer que le coup noir est bien enregistré..."
+          sleep 60
+
       # 15) Generate black SVG + PNG
       - name: Generate black SVG & PNG
         run: python 06_generate_black_svg.py
