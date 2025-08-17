@@ -109,9 +109,9 @@ def format_history_lines(moves):
         num = (i // 2) + 1
         bloc = moves[i:i+2]
         if len(bloc) == 1:
-            lignes.append(f'<tspan fill="red" font-weight="bold">{num}.</tspan> {bloc[0]}')
+            lignes.append(f'<tspan fill="red">{num}.</tspan> {bloc[0]}')
         else:
-            lignes.append(f'<tspan fill="red" font-weight="bold">{num}.</tspan> {bloc[0]} {bloc[1]}')
+            lignes.append(f'<tspan fill="red">{num}.</tspan> {bloc[0]} {bloc[1]}')
     # retour à la ligne toutes les 4 paires de coups (soit 8 demi-coups)
     lignes_split = []
     for j in range(0, len(lignes), 4):
@@ -137,7 +137,7 @@ historique_svg = ""
 for i, ligne in enumerate(historique_lignes):
     y = 370 + i * 34
     historique_svg += f"""
-    <text x="700" y="{y}" font-size="18" font-family="Ubuntu" fill="#333">
+    <text x="700" y="{y}" font-size="16" font-family="Ubuntu" fill="#333">
         {ligne}
     </text>"""
 
