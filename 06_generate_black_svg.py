@@ -1,4 +1,4 @@
-# 06_generate_black_svg.py — version UCI brut via account/playing uniquement + dernier coup en SAN FR
+# 06_generate_black_svg.py — version lastMove + FEN uniquement
 
 import os
 import re
@@ -39,21 +39,6 @@ def _force_board_colors(svg_str, light="#ebf0f7", dark="#6095df"):
                      svg_str, count=1)
     return svg_str
 
-# --- Traduction SAN → français ---
-SAN_TRANSLATE = {
-    "N": "C",  # Knight → Cavalier
-    "B": "F",  # Bishop → Fou
-    "R": "T",  # Rook → Tour
-    "Q": "D",  # Queen → Dame
-    "K": "R",  # King → Roi
-}
-def san_to_french(san: str) -> str:
-    if not san:
-        return ""
-    if san[0] in SAN_TRANSLATE:
-        return SAN_TRANSLATE[san[0]] + san[1:]
-    return san
-
 # --- API Lichess (account/playing live) ---
 print("📥 Récupération de l'état de la partie en cours (live)…")
 token = os.getenv("LICHESS_BOT_TOKEN")
@@ -77,77 +62,46 @@ if not games:
 g = games[0]
 game_id = g["gameId"]
 fen = g["fen"]
+last_move_uci = g.get("lastMove", "")
+
 print(f"♟️ Partie détectée: {game_id}")
 print("FEN actuelle:", fen)
+print("Dernier coup (UCI brut):", last_move_uci)
 
 # --- Reconstruction échiquier depuis FEN ---
 board = chess.Board(fen)
 
-# --- Historique brut (UCI) depuis account/playing ---
-moves_str = g.get("moves", "").strip()
-moves_list = moves_str.split() if moves_str else []
-print("Historique UCI (via account/playing):", moves_list)
+# --- Conversion du dernier coup en notation française ---
+def san_to_french(san: str) -> str:
+    mapping = {"K": "R", "Q": "D", "R": "T", "B": "F", "N": "C"}  # roi, dame, tour, fou, cavalier
+    for eng, fr in mapping.items():
+        san = san.replace(eng, fr)
+    return san
 
-# Dernier coup brut (UCI)
-last_move = moves_list[-1] if moves_list else ""
-last_san_fr = ""
-if last_move:
+last_move_fr = ""
+if last_move_uci:
     try:
-        move = chess.Move.from_uci(last_move)
-        board_before = chess.Board()  # recommencer depuis la position initiale
-        for mv in moves_list[:-1]:    # rejouer tous les coups sauf le dernier
-            board_before.push(chess.Move.from_uci(mv))
-        last_san = board_before.san(move)   # SAN anglais
-        last_san_fr = san_to_french(last_san)  # SAN français
+        move = chess.Move.from_uci(last_move_uci)
+        # on recrée la position avant le coup
+        board_before = chess.Board(fen)
+        board_before.pop()  # revient au coup précédent
+        last_san = board_before.san(move)  # ex: Qc3
+        last_move_fr = san_to_french(last_san)  # ex: Dc3
     except Exception as e:
         print("❌ Erreur conversion SAN:", e)
-        last_san_fr = last_move
 
-print("Dernier coup (UCI):", last_move)
-print("Dernier coup (FR):", last_san_fr)
-
-# --- Historique formaté (toujours UCI brut) ---
-def format_history_lines(moves):
-    lignes = []
-    for i in range(0, len(moves), 2):  # chaque tour = 2 demi-coups
-        num = (i // 2) + 1
-        bloc = moves[i:i+2]
-        if len(bloc) == 1:
-            lignes.append(f'<tspan fill="red">{num}.</tspan> {bloc[0]}')
-        else:
-            lignes.append(f'<tspan fill="red">{num}.</tspan> {bloc[0]} {bloc[1]}')
-    # retour à la ligne toutes les 5 paires
-    lignes_split = []
-    for j in range(0, len(lignes), 5):
-        lignes_split.append(" ".join(lignes[j:j+5]))
-    return lignes_split
-
-if not moves_list:
-    historique_lignes = ["(aucun coup pour le moment)"]
-else:
-    historique_lignes = format_history_lines(moves_list)
+print("Dernier coup (FR):", last_move_fr)
 
 # --- Génération échiquier SVG ---
 svg_echiquier = chess.svg.board(
     board=board,
     orientation=chess.WHITE,
     size=620,
-    lastmove=chess.Move.from_uci(last_move) if last_move else None
+    lastmove=chess.Move.from_uci(last_move_uci) if last_move_uci else None
 )
 svg_echiquier = _force_board_colors(svg_echiquier)
 
 # --- Construction SVG esthétique complet ---
-historique_svg = ""
-for i, ligne in enumerate(historique_lignes):
-    y = 360 + i * 34
-    historique_svg += f"""
-    <text x="690" y="{y}" font-size="14" font-family="Ubuntu" fill="#333">
-        {ligne}
-    </text>"""
-
-# numéro du tour basé sur moves_list
-tour = (len(moves_list) // 2) + 1
-
 svg_final = f"""<?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <svg width="1280" height="720" xmlns="http://www.w3.org/2000/svg">
   <!-- Fond général -->
@@ -171,21 +125,11 @@ svg_final = f"""<?xml version="1.0" encoding="UTF-8" standalone="no"?>
 
   <!-- Infos partie -->
   <text x="700" y="180" font-size="26" font-family="Ubuntu" fill="#111">
-    Dernier coup : {last_san_fr}
+    Dernier coup : {last_move_fr if last_move_fr else "(aucun)"}
   </text>
   <text x="700" y="230" font-size="28" font-family="Ubuntu" fill="#111">
     ➤ Choisissez le prochain coup !
   </text>
-  <text x="700" y="280" font-size="22" font-family="Ubuntu" fill="#555">
-    Tour : {tour}
-  </text>
-
-  <!-- Historique -->
-  <rect x="680" y="295" width="540" height="340" fill="#fff" stroke="#d1d5db" stroke-width="1" rx="8" ry="8"/>
-  <text x="700" y="330" font-size="24" font-family="Ubuntu" fill="#1f2937" font-weight="bold">
-    ☰ Historique des coups :
-  </text>
-  {historique_svg}
 
   <!-- Footer -->
   <text x="750" y="700" font-size="25" font-family="Ubuntu" fill="#1f2937" font-weight="bold">
