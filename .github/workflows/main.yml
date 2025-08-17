@@ -119,7 +119,7 @@ jobs:
       - name: Delay before generating SVG
         run: |
           echo "⏳ Pause 60s pour s'assurer que le coup noir est bien enregistré..."
-          sleep 60
+          sleep 90
 
       # 15) Generate black SVG + PNG
       - name: Generate black SVG & PNG
