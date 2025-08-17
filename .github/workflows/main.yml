@@ -118,7 +118,7 @@ jobs:
       # 14bis) Delay to ensure black move is fully registered
       - name: Delay before generating SVG
         run: |
-          echo "⏳ Pause 60s pour s'assurer que le coup noir est bien enregistré..."
+          echo "⏳ Pause 90s pour s'assurer que le coup noir est bien enregistré..."
           sleep 90
 
       # 15) Generate black SVG + PNG
