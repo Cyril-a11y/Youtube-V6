@@ -43,22 +43,22 @@ R . P . . P P .
     ☰ Historique des coups :
   </text>
   
-    <text x="670" y="360" font-size="14" font-family="Ubuntu" fill="#333">
+    <text x="690" y="360" font-size="14" font-family="Ubuntu" fill="#333">
         <tspan fill="red">1.</tspan> e4 Nf6 <tspan fill="red">2.</tspan> Nc3 g6 <tspan fill="red">3.</tspan> a3 Bg7 <tspan fill="red">4.</tspan> Nf3 d5 <tspan fill="red">5.</tspan> h3 Nxe4
     </text>
-    <text x="670" y="394" font-size="14" font-family="Ubuntu" fill="#333">
+    <text x="690" y="394" font-size="14" font-family="Ubuntu" fill="#333">
         <tspan fill="red">6.</tspan> b3 Nxc3 <tspan fill="red">7.</tspan> dxc3 Qd6 <tspan fill="red">8.</tspan> Nd4 e5 <tspan fill="red">9.</tspan> Nb5 Qe7 <tspan fill="red">10.</tspan> Bg5 f6
     </text>
-    <text x="670" y="428" font-size="14" font-family="Ubuntu" fill="#333">
+    <text x="690" y="428" font-size="14" font-family="Ubuntu" fill="#333">
         <tspan fill="red">11.</tspan> Bh4 c6 <tspan fill="red">12.</tspan> a4 a6 <tspan fill="red">13.</tspan> Bxf6 Bxf6 <tspan fill="red">14.</tspan> Nc7+ Qxc7 <tspan fill="red">15.</tspan> Be2 b6
     </text>
-    <text x="670" y="462" font-size="14" font-family="Ubuntu" fill="#333">
+    <text x="690" y="462" font-size="14" font-family="Ubuntu" fill="#333">
         <tspan fill="red">16.</tspan> Bg4 Qe7 <tspan fill="red">17.</tspan> Bxc8 Qa7 <tspan fill="red">18.</tspan> Qg4 Qg7 <tspan fill="red">19.</tspan> O-O Qh6 <tspan fill="red">20.</tspan> Qe6+ Kd8
     </text>
-    <text x="670" y="496" font-size="14" font-family="Ubuntu" fill="#333">
+    <text x="690" y="496" font-size="14" font-family="Ubuntu" fill="#333">
         <tspan fill="red">21.</tspan> Qxf6+ Kxc8 <tspan fill="red">22.</tspan> Qxh8+ Kc7 <tspan fill="red">23.</tspan> Qxe5+ Kd8 <tspan fill="red">24.</tspan> Rfe1 Qxh3 <tspan fill="red">25.</tspan> Ra2 h6
     </text>
-    <text x="670" y="530" font-size="14" font-family="Ubuntu" fill="#333">
+    <text x="690" y="530" font-size="14" font-family="Ubuntu" fill="#333">
         <tspan fill="red">26.</tspan> Qd6+ Nd7 <tspan fill="red">27.</tspan> Qxc6
     </text>
 
