@@ -29,10 +29,12 @@ jobs:
           mkdir -p data
           ELO="${{ github.event.inputs.elo }}"
           if [ -z "$ELO" ] || [ "$ELO" = "null" ]; then
+            echo "⚠️ Aucun Elo fourni en entrée, utilisation de la valeur par défaut 1750."
             ELO=1750
           fi
           echo "$ELO" > data/bot_elo.txt
-          echo "📌 Elo sauvegardé dans data/bot_elo.txt : $(cat data/bot_elo.txt)"
+          echo "🎯 Elo choisi: $ELO"
+          echo "💾 Contenu actuel de data/bot_elo.txt : $(cat data/bot_elo.txt)"
 
       # 3) Installer Stockfish + dépendances Python
       - name: Install Stockfish & Python deps
@@ -48,6 +50,9 @@ jobs:
           LICHESS_BOT_TOKEN: ${{ secrets.LICHESS_BOT_TOKEN }}
         run: |
           mkdir -p data
+
+          echo "📂 Vérification bot_elo.txt avant lancement:"
+          cat data/bot_elo.txt || echo "❌ Fichier bot_elo.txt introuvable"
 
           # Récupérer infos partie en live
           GAME_JSON=$(curl -s -H "Authorization: Bearer $LICHESS_BOT_TOKEN" https://lichess.org/api/account/playing)
@@ -82,12 +87,13 @@ jobs:
           token = os.environ["LICHESS_BOT_TOKEN"]
 
           # Lire Elo depuis bot_elo.txt
-          try:
-              elo = int((data_dir / "bot_elo.txt").read_text(encoding="utf-8").strip())
-          except Exception:
+          elo_file = data_dir / "bot_elo.txt"
+          if elo_file.exists():
+              elo = int(elo_file.read_text(encoding="utf-8").strip())
+              print(f"📌 Elo lu depuis bot_elo.txt: {elo}")
+          else:
               elo = 1500
-
-          print(f"📌 Elo utilisé pour Stockfish: {elo}")
+              print("⚠️ bot_elo.txt introuvable, fallback 1500")
 
           # Lire FEN et moves
           fen_path = data_dir / "position_before_black.fen"
@@ -120,7 +126,7 @@ jobs:
           move = result.move
           engine.quit()
 
-          print(f"🤖 Coup choisi: {move.uci()}")
+          print(f"🤖 Coup choisi par Stockfish Elo={elo}: {move.uci()}")
           board.push(move)
 
           # Envoi à Lichess
@@ -161,7 +167,7 @@ jobs:
           })
           history_file.write_text(json.dumps(history, ensure_ascii=False, indent=2), encoding="utf-8")
 
-          print("✅ position.fen, dernier_coup.json, move_history.json mis à jour (bot_elo.txt déjà présent)")
+          print("✅ position.fen, dernier_coup.json, move_history.json mis à jour")
           PY
 
           python3 play_move.py
