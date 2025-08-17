@@ -12,7 +12,7 @@ LICHESS_BOT_TOKEN = os.getenv("LICHESS_BOT_TOKEN")
 BOT_ELO_FILE = Path("data/bot_elo.txt")
 
 # Elo par défaut (si fichier absent ou corrompu)
-DEFAULT_ELO = 1750
+DEFAULT_ELO = 1300
 
 def log(msg, tag="ℹ️"):
     print(f"{tag} {msg}")
