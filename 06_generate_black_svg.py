@@ -80,25 +80,16 @@ try:
     export_url = f"https://lichess.org/game/export/{game_id}?moves=1&tags=0&pgnInJson=1"
     resp_pgn = requests.get(
         export_url,
-        headers={"Authorization": f"Bearer {token}", "Accept": "application/json"},  # ✅ fix
+        headers={"Authorization": f"Bearer {token}", "Accept": "application/json"},  # ✅ JSON direct
         timeout=10
     )
     if resp_pgn.status_code == 200:
         game_data = resp_pgn.json()
 
-        # --- Historique des coups ---
+        # --- Historique des coups (déjà en SAN !) ---
         pgn_moves = game_data.get("moves", "").strip().split()
-        tmp_board = chess.Board()
-        for uci in pgn_moves:
-            try:
-                mv = chess.Move.from_uci(uci)
-                san = tmp_board.san(mv)
-                moves_list.append(san)
-                tmp_board.push(mv)
-            except Exception as e:
-                print(f"⚠️ Erreur SAN sur {uci}: {e}")
-        if moves_list:
-            last_san = moves_list[-1]
+        moves_list = pgn_moves
+        last_san = moves_list[-1] if moves_list else ""
         print("Historique SAN (via game/export):", moves_list)
 
         # --- Vérifier si partie terminée ---
