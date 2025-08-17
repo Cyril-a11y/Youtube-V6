@@ -1,12 +1,7 @@
 name: Run Lichess Bot (Direct Black Move Live)
 
 on:
-  workflow_dispatch:
-    inputs:
-      elo:
-        description: "Elo simulé par Stockfish (1350–2850)"
-        required: false
-        default: "1750"
+  workflow_dispatch: {}
 
 permissions:
   contents: write
@@ -23,20 +18,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      # 2) Sauvegarder Elo choisi dans bot_elo.txt
-      - name: Save Elo to bot_elo.txt
-        run: |
-          mkdir -p data
-          ELO="${{ github.event.inputs.elo }}"
-          if [ -z "$ELO" ] || [ "$ELO" = "null" ]; then
-            echo "⚠️ Aucun Elo fourni en entrée, utilisation de la valeur par défaut 1750."
-            ELO=1750
-          fi
-          echo "$ELO" > data/bot_elo.txt
-          echo "🎯 Elo choisi: $ELO"
-          echo "💾 Contenu actuel de data/bot_elo.txt : $(cat data/bot_elo.txt)"
-
-      # 3) Installer Stockfish + dépendances Python
+      # 2) Installer Stockfish + dépendances Python
       - name: Install Stockfish & Python deps
         run: |
           sudo apt-get update
@@ -44,7 +26,7 @@ jobs:
           python3 -m pip install --upgrade pip
           python3 -m pip install python-chess requests
 
-      # 4) Jouer le coup noir (live avec account/playing)
+      # 3) Jouer le coup noir (live avec account/playing)
       - name: Play best black move (live)
         env:
           LICHESS_BOT_TOKEN: ${{ secrets.LICHESS_BOT_TOKEN }}
@@ -52,7 +34,12 @@ jobs:
           mkdir -p data
 
           echo "📂 Vérification bot_elo.txt avant lancement:"
-          cat data/bot_elo.txt || echo "❌ Fichier bot_elo.txt introuvable"
+          if [ -f data/bot_elo.txt ]; then
+            cat data/bot_elo.txt
+          else
+            echo "❌ bot_elo.txt introuvable -> fallback 1500"
+            echo "1500" > data/bot_elo.txt
+          fi
 
           # Récupérer infos partie en live
           GAME_JSON=$(curl -s -H "Authorization: Bearer $LICHESS_BOT_TOKEN" https://lichess.org/api/account/playing)
@@ -86,11 +73,15 @@ jobs:
           game_id = os.environ["GAME_ID"]
           token = os.environ["LICHESS_BOT_TOKEN"]
 
-          # Lire Elo depuis bot_elo.txt
+          # Lire Elo depuis bot_elo.txt (fallback 1500 si absent)
           elo_file = data_dir / "bot_elo.txt"
           if elo_file.exists():
-              elo = int(elo_file.read_text(encoding="utf-8").strip())
-              print(f"📌 Elo lu depuis bot_elo.txt: {elo}")
+              try:
+                  elo = int(elo_file.read_text(encoding="utf-8").strip())
+                  print(f"📌 Elo lu depuis bot_elo.txt: {elo}")
+              except Exception:
+                  elo = 1500
+                  print("⚠️ Erreur lecture bot_elo.txt, fallback 1500")
           else:
               elo = 1500
               print("⚠️ bot_elo.txt introuvable, fallback 1500")
@@ -172,7 +163,7 @@ jobs:
 
           python3 play_move.py
 
-      # 5) Commit & push avec rebase
+      # 4) Commit & push avec rebase
       - name: Commit updated files
         run: |
           git config user.name "github-actions"
