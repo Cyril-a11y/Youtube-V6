@@ -1,5 +1,4 @@
-# 06_generate_black_svg.py — version finale avec icônes compatibles PNG
-# FEN via account/playing, historique via game/export, vainqueur si terminé
+# 06_generate_black_svg.py — version UCI brut via account/playing uniquement
 
 import os
 import re
@@ -70,37 +69,13 @@ print("FEN actuelle:", fen)
 # --- Reconstruction échiquier depuis FEN ---
 board = chess.Board(fen)
 
-# --- Récupération historique via game/export ---
-moves_list = []
-game_status = "ongoing"
-winner = None
+# --- Historique brut (UCI) depuis account/playing ---
+moves_str = g.get("moves", "").strip()
+moves_list = moves_str.split() if moves_str else []
+print("Historique UCI (via account/playing):", moves_list)
 
-try:
-    export_url = f"https://lichess.org/game/export/{game_id}?moves=1&tags=0&pgnInJson=1"
-    resp_pgn = requests.get(
-        export_url,
-        headers={"Authorization": f"Bearer {token}", "Accept": "application/json"},  # ✅ JSON direct
-        timeout=10
-    )
-    if resp_pgn.status_code == 200:
-        game_data = resp_pgn.json()
-
-        # --- Historique des coups (déjà en SAN !) ---
-        pgn_moves = game_data.get("moves", "").strip().split()
-        moves_list = pgn_moves
-        print("Historique SAN (via game/export):", moves_list)
-
-        # --- Vérifier si partie terminée ---
-        if game_data.get("status") != "started":
-            game_status = game_data.get("status")
-            winner = game_data.get("winner")  # "white" | "black" | None
-    else:
-        print(f"⚠️ Impossible de récupérer le PGN complet ({resp_pgn.status_code})")
-except Exception as e:
-    print(f"⚠️ Erreur lors du fetch game/export: {e}")
-
-# --- Dernier coup SAN basé uniquement sur l'historique ---
-last_san = moves_list[-1] if moves_list else ""
+# Dernier coup brut (UCI)
+last_move = moves_list[-1] if moves_list else ""
 
 # --- Historique formaté ---
 def format_history_lines(moves):
@@ -112,7 +87,7 @@ def format_history_lines(moves):
             lignes.append(f'<tspan fill="red">{num}.</tspan> {bloc[0]}')
         else:
             lignes.append(f'<tspan fill="red">{num}.</tspan> {bloc[0]} {bloc[1]}')
-    # retour à la ligne toutes les 4 paires de coups (soit 8 demi-coups)
+    # retour à la ligne toutes les 5 paires
     lignes_split = []
     for j in range(0, len(lignes), 5):
         lignes_split.append(" ".join(lignes[j:j+5]))
@@ -141,18 +116,8 @@ for i, ligne in enumerate(historique_lignes):
         {ligne}
     </text>"""
 
-# numéro du tour basé sur moves_list (correct)
+# numéro du tour basé sur moves_list
 tour = (len(moves_list) // 2) + 1
-
-# --- Message fin de partie ---
-end_text = ""
-if game_status != "ongoing":
-    if winner == "white":
-        end_text = f"✅ Partie terminée — Vainqueur : {NOM_BLANCS}"
-    elif winner == "black":
-        end_text = f"✅ Partie terminée — Vainqueur : {NOM_NOIRS}"
-    else:
-        end_text = f"🤝 Partie terminée — Résultat : {game_status}"
 
 svg_final = f"""<?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <svg width="1280" height="720" xmlns="http://www.w3.org/2000/svg">
@@ -177,7 +142,7 @@ svg_final = f"""<?xml version="1.0" encoding="UTF-8" standalone="no"?>
 
   <!-- Infos partie -->
   <text x="700" y="180" font-size="26" font-family="Ubuntu" fill="#111">
-    Dernier coup : {last_san}
+    Dernier coup : {last_move}
   </text>
   <text x="700" y="230" font-size="28" font-family="Ubuntu" fill="#111">
     ➤ Choisissez le prochain coup !
@@ -192,11 +157,6 @@ svg_final = f"""<?xml version="1.0" encoding="UTF-8" standalone="no"?>
     ☰ Historique des coups :
   </text>
   {historique_svg}
-
-  <!-- Fin de partie -->
-  <text x="700" y="660" font-size="28" font-family="Ubuntu" fill="#dc2626" font-weight="bold">
-    {end_text}
-  </text>
 
   <!-- Footer -->
   <text x="750" y="700" font-size="25" font-family="Ubuntu" fill="#1f2937" font-weight="bold">
