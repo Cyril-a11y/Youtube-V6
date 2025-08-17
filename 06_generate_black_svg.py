@@ -72,7 +72,6 @@ board = chess.Board(fen)
 
 # --- Récupération historique via game/export ---
 moves_list = []
-last_san = ""
 game_status = "ongoing"
 winner = None
 
@@ -89,7 +88,6 @@ try:
         # --- Historique des coups (déjà en SAN !) ---
         pgn_moves = game_data.get("moves", "").strip().split()
         moves_list = pgn_moves
-        last_san = moves_list[-1] if moves_list else ""
         print("Historique SAN (via game/export):", moves_list)
 
         # --- Vérifier si partie terminée ---
@@ -100,6 +98,14 @@ try:
         print(f"⚠️ Impossible de récupérer le PGN complet ({resp_pgn.status_code})")
 except Exception as e:
     print(f"⚠️ Erreur lors du fetch game/export: {e}")
+
+# --- Dernier coup SAN basé sur FEN live ---
+last_san = ""
+if board.move_stack:
+    try:
+        last_san = board.san(board.peek())
+    except Exception:
+        last_san = moves_list[-1] if moves_list else ""
 
 # --- Historique formaté ---
 def format_history_lines(moves):
