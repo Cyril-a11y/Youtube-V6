@@ -117,6 +117,10 @@ def format_history_lines(moves):
         lignes_split.append(" ".join(lignes[j:j+4]))
     return lignes_split
 
+if not moves_list:
+    historique_lignes = ["(aucun coup pour le moment)"]
+else:
+    historique_lignes = format_history_lines(moves_list)
 
 # --- Génération échiquier SVG ---
 svg_echiquier = chess.svg.board(
