@@ -1,4 +1,4 @@
-# 06_generate_black_svg.py — version UCI brut via account/playing uniquement, avec logs bruts
+# 06_generate_black_svg.py — version avec dernier coup en SAN via lastMove + FEN
 
 import os
 import re
@@ -7,7 +7,6 @@ import requests
 import chess.svg
 from pathlib import Path
 import cairosvg   # ✅ rendu SVG → PNG plus fiable
-import json
 
 # --- Fichiers ---
 DATA_DIR = Path("data")
@@ -15,7 +14,7 @@ SVG_FILE = DATA_DIR / "thumbnail_black.svg"
 PNG_FILE = DATA_DIR / "thumbnail_black.png"
 BOT_ELO_FILE = DATA_DIR / "bot_elo.txt"
 
-# --- Lecture Elo du bot (obligatoire, sans fallback) ---
+# --- Lecture Elo du bot ---
 if not BOT_ELO_FILE.exists():
     raise SystemExit("❌ bot_elo.txt introuvable — le workflow doit l'écrire avant.")
 
@@ -61,86 +60,53 @@ if not games:
 
 # On prend la 1ère partie active
 g = games[0]
-
-# --- Log brut des données de la partie ---
-print("=== Données brutes account/playing ===")
-print(json.dumps(g, indent=2, ensure_ascii=False))
-print("======================================")
-
 game_id = g["gameId"]
 fen = g["fen"]
+last_uci = g.get("lastMove")
 
 print(f"♟️ Partie détectée: {game_id}")
 print("FEN actuelle:", fen)
+print("Dernier coup UCI brut:", last_uci)
 
 # --- Reconstruction échiquier depuis FEN ---
 board = chess.Board(fen)
 
-# --- Historique brut (UCI) depuis account/playing ---
-moves_str = g.get("moves", "").strip()
-moves_list = moves_str.split() if moves_str else []
-print("Historique UCI (via account/playing):", moves_list)
+# --- Conversion dernier coup en SAN ---
+last_san = ""
+if last_uci:
+    move = chess.Move.from_uci(last_uci)
+    # pièce qui a bougé (dans la FEN avant coup)
+    piece = board.piece_at(move.from_square)
+    print("Pièce détectée:", piece.symbol() if piece else "❌ inconnu")
 
-# Dernier coup brut (UCI)
-last_move = moves_list[-1] if moves_list else ""
-print("Dernier coup UCI:", last_move)
+    try:
+        # ⚠️ Comme la FEN est après coup, il faut "reculer" pour obtenir le SAN
+        board_before = board.copy()
+        board_before.pop()  # annule le dernier coup
+        last_san = board_before.san(move)
+    except Exception as e:
+        print("❌ Impossible de reconstruire le SAN:", e)
+        last_san = last_uci
 
-# --- Historique formaté ---
-def format_history_lines(moves):
-    lignes = []
-    for i in range(0, len(moves), 2):  # chaque tour = 2 demi-coups
-        num = (i // 2) + 1
-        bloc = moves[i:i+2]
-        if len(bloc) == 1:
-            lignes.append(f'<tspan fill="red">{num}.</tspan> {bloc[0]}')
-        else:
-            lignes.append(f'<tspan fill="red">{num}.</tspan> {bloc[0]} {bloc[1]}')
-    # retour à la ligne toutes les 5 paires
-    lignes_split = []
-    for j in range(0, len(lignes), 5):
-        lignes_split.append(" ".join(lignes[j:j+5]))
-    return lignes_split
-
-if not moves_list:
-    historique_lignes = ["(aucun coup pour le moment)"]
-else:
-    historique_lignes = format_history_lines(moves_list)
+print("Dernier coup SAN:", last_san)
 
 # --- Génération échiquier SVG ---
 svg_echiquier = chess.svg.board(
     board=board,
     orientation=chess.WHITE,
     size=620,
-    lastmove=board.peek() if board.move_stack else None
+    lastmove=chess.Move.from_uci(last_uci) if last_uci else None
 )
 svg_echiquier = _force_board_colors(svg_echiquier)
 
-# --- Construction SVG esthétique complet ---
-historique_svg = ""
-for i, ligne in enumerate(historique_lignes):
-    y = 360 + i * 34
-    historique_svg += f"""
-    <text x="690" y="{y}" font-size="14" font-family="Ubuntu" fill="#333">
-        {ligne}
-    </text>"""
-
-# numéro du tour basé sur moves_list
-tour = (len(moves_list) // 2) + 1
-
+# --- Construction SVG ---
 svg_final = f"""<?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <svg width="1280" height="720" xmlns="http://www.w3.org/2000/svg">
-  <!-- Fond général -->
   <rect width="100%" height="100%" fill="#f9fafb"/>
 
-  <!-- Titre et instructions -->
+  <!-- Titre -->
   <text x="75%" y="60" text-anchor="middle" font-size="35" font-family="Ubuntu" fill="#1f2937">
     ♟️ Partie Interactive !
-  </text>
-  <text x="700" y="105" font-size="22" font-family="Ubuntu" fill="#1f2937">
-    1. Postez votre coup en commentaire.
-  </text>
-  <text x="700" y="135" font-size="22" font-family="Ubuntu" fill="#1f2937">
-    2. Le coup majoritaire sera joué automatiquement !
   </text>
 
   <!-- Échiquier -->
@@ -150,33 +116,7 @@ svg_final = f"""<?xml version="1.0" encoding="UTF-8" standalone="no"?>
 
   <!-- Infos partie -->
   <text x="700" y="180" font-size="26" font-family="Ubuntu" fill="#111">
-    Dernier coup : {last_move}
-  </text>
-  <text x="700" y="230" font-size="28" font-family="Ubuntu" fill="#111">
-    ➤ Choisissez le prochain coup !
-  </text>
-  <text x="700" y="280" font-size="22" font-family="Ubuntu" fill="#555">
-    Tour : {tour}
-  </text>
-
-  <!-- Historique -->
-  <rect x="680" y="295" width="540" height="340" fill="#fff" stroke="#d1d5db" stroke-width="1" rx="8" ry="8"/>
-  <text x="700" y="330" font-size="24" font-family="Ubuntu" fill="#1f2937" font-weight="bold">
-    ☰ Historique des coups :
-  </text>
-  {historique_svg}
-
-  <!-- Footer -->
-  <text x="750" y="700" font-size="25" font-family="Ubuntu" fill="#1f2937" font-weight="bold">
-    Chaîne YOUTUBE : PriseEnPassant
-  </text>
-
-  <!-- Légende joueurs -->
-  <text x="50" y="40" font-size="22" font-family="Ubuntu" fill="#1f2937">
-    ♟️ {NOM_NOIRS}
-  </text>
-  <text x="50" y="700" font-size="22" font-family="Ubuntu" fill="#1f2937">
-    ♟️ {NOM_BLANCS}
+    Dernier coup : {last_san}
   </text>
 </svg>
 """
@@ -184,7 +124,6 @@ svg_final = f"""<?xml version="1.0" encoding="UTF-8" standalone="no"?>
 SVG_FILE.write_text(svg_final, encoding="utf-8")
 print(f"✅ SVG généré : {SVG_FILE}")
 
-# --- Conversion PNG robuste ---
 try:
     cairosvg.svg2png(bytestring=svg_final.encode("utf-8"), write_to=str(PNG_FILE))
     print(f"✅ PNG miniature générée : {PNG_FILE}")
