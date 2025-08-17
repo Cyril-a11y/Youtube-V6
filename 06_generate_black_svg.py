@@ -1,4 +1,4 @@
-# 06_generate_black_svg.py — version avec dernier coup en SAN via lastMove + FEN
+# 06_generate_black_svg.py — version dernier coup en français (ex: Dc3)
 
 import os
 import re
@@ -39,7 +39,25 @@ def _force_board_colors(svg_str, light="#ebf0f7", dark="#6095df"):
                      svg_str, count=1)
     return svg_str
 
-# --- API Lichess (account/playing live) ---
+# --- Traduction SAN → français ---
+SAN_TRANSLATE = {
+    "N": "C",  # Knight → Cavalier
+    "B": "F",  # Bishop → Fou
+    "R": "T",  # Rook → Tour
+    "Q": "D",  # Queen → Dame
+    "K": "R",  # King → Roi
+}
+
+def san_to_french(san: str) -> str:
+    if not san:
+        return ""
+    # Remplacer seulement la première lettre si c’est une pièce
+    first = san[0]
+    if first in SAN_TRANSLATE:
+        return SAN_TRANSLATE[first] + san[1:]
+    return san
+
+# --- API Lichess ---
 print("📥 Récupération de l'état de la partie en cours (live)…")
 token = os.getenv("LICHESS_BOT_TOKEN")
 if not token:
@@ -71,24 +89,23 @@ print("Dernier coup UCI brut:", last_uci)
 # --- Reconstruction échiquier depuis FEN ---
 board = chess.Board(fen)
 
-# --- Conversion dernier coup en SAN ---
-last_san = ""
+# --- Conversion dernier coup en SAN + français ---
+last_san, last_san_fr = "", ""
 if last_uci:
     move = chess.Move.from_uci(last_uci)
-    # pièce qui a bougé (dans la FEN avant coup)
-    piece = board.piece_at(move.from_square)
-    print("Pièce détectée:", piece.symbol() if piece else "❌ inconnu")
-
     try:
-        # ⚠️ Comme la FEN est après coup, il faut "reculer" pour obtenir le SAN
+        # Reculer pour trouver le SAN
         board_before = board.copy()
-        board_before.pop()  # annule le dernier coup
+        board_before.pop()
         last_san = board_before.san(move)
+        last_san_fr = san_to_french(last_san)
     except Exception as e:
         print("❌ Impossible de reconstruire le SAN:", e)
         last_san = last_uci
+        last_san_fr = last_uci
 
-print("Dernier coup SAN:", last_san)
+print("Dernier coup SAN (anglais):", last_san)
+print("Dernier coup SAN (français):", last_san_fr)
 
 # --- Génération échiquier SVG ---
 svg_echiquier = chess.svg.board(
@@ -116,7 +133,7 @@ svg_final = f"""<?xml version="1.0" encoding="UTF-8" standalone="no"?>
 
   <!-- Infos partie -->
   <text x="700" y="180" font-size="26" font-family="Ubuntu" fill="#111">
-    Dernier coup : {last_san}
+    Dernier coup : {last_san_fr}
   </text>
 </svg>
 """
