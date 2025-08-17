@@ -114,8 +114,8 @@ def format_history_lines(moves):
             lignes.append(f'<tspan fill="red">{num}.</tspan> {bloc[0]} {bloc[1]}')
     # retour à la ligne toutes les 4 paires de coups (soit 8 demi-coups)
     lignes_split = []
-    for j in range(0, len(lignes), 4):
-        lignes_split.append(" ".join(lignes[j:j+4]))
+    for j in range(0, len(lignes), 5):
+        lignes_split.append(" ".join(lignes[j:j+5]))
     return lignes_split
 
 if not moves_list:
@@ -135,9 +135,9 @@ svg_echiquier = _force_board_colors(svg_echiquier)
 # --- Construction SVG esthétique complet ---
 historique_svg = ""
 for i, ligne in enumerate(historique_lignes):
-    y = 370 + i * 34
+    y = 380 + i * 34
     historique_svg += f"""
-    <text x="700" y="{y}" font-size="16" font-family="Ubuntu" fill="#333">
+    <text x="700" y="{y}" font-size="15" font-family="Ubuntu" fill="#333">
         {ligne}
     </text>"""
 
