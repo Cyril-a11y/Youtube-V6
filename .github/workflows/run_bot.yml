@@ -1,7 +1,20 @@
 name: Run Lichess Bot (Direct Black Move Live)
 
 on:
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      elo:
+        description: "Elo simulé"
+        required: true
+        default: "1500"
+      mode:
+        description: "Mode de jeu (uci, random, depth)"
+        required: false
+        default: "uci"
+      depth:
+        description: "Profondeur max (uniquement si mode=depth)"
+        required: false
+        default: ""
 
 permissions:
   contents: write
@@ -30,16 +43,15 @@ jobs:
       - name: Play best black move (live)
         env:
           LICHESS_BOT_TOKEN: ${{ secrets.LICHESS_BOT_TOKEN }}
+          BOT_ELO: ${{ github.event.inputs.elo }}
+          BOT_MODE: ${{ github.event.inputs.mode }}
+          BOT_DEPTH: ${{ github.event.inputs.depth }}
         run: |
           mkdir -p data
 
           echo "📂 Vérification bot_elo.txt avant lancement:"
-          if [ -f data/bot_elo.txt ]; then
-            cat data/bot_elo.txt
-          else
-            echo "❌ bot_elo.txt introuvable -> fallback 1500"
-            echo "1500" > data/bot_elo.txt
-          fi
+          echo "$BOT_ELO" > data/bot_elo.txt
+          cat data/bot_elo.txt
 
           # Récupérer infos partie en live
           GAME_JSON=$(curl -s -H "Authorization: Bearer $LICHESS_BOT_TOKEN" https://lichess.org/api/account/playing)
@@ -65,7 +77,7 @@ jobs:
 
           # Script Python pour jouer le coup noir
           cat > play_move.py <<'PY'
-          import os, json, shutil, chess, chess.engine, requests
+          import os, json, shutil, chess, chess.engine, requests, random
           from pathlib import Path
           from datetime import datetime, timezone
 
@@ -73,20 +85,12 @@ jobs:
           game_id = os.environ["GAME_ID"]
           token = os.environ["LICHESS_BOT_TOKEN"]
 
-          # Lire Elo depuis bot_elo.txt (fallback 1500 si absent)
-          elo_file = data_dir / "bot_elo.txt"
-          if elo_file.exists():
-              try:
-                  elo = int(elo_file.read_text(encoding="utf-8").strip())
-                  print(f"📌 Elo lu depuis bot_elo.txt: {elo}")
-              except Exception:
-                  elo = 1500
-                  print("⚠️ Erreur lecture bot_elo.txt, fallback 1500")
-          else:
-              elo = 1500
-              print("⚠️ bot_elo.txt introuvable, fallback 1500")
+          elo = int(os.environ.get("BOT_ELO", "1500"))
+          mode = os.environ.get("BOT_MODE", "uci")
+          depth = os.environ.get("BOT_DEPTH", "")
 
-          # Lire FEN et moves
+          print(f"⚙️ Mode={mode}, Elo={elo}, Depth={depth}")
+
           fen_path = data_dir / "position_before_black.fen"
           moves_path = data_dir / "moves_before_black.txt"
           fen = fen_path.read_text(encoding="utf-8").strip()
@@ -105,19 +109,28 @@ jobs:
               print("⚠️ Ce n'est pas aux Noirs de jouer.")
               exit(0)
 
-          # Choix du coup via Stockfish
-          stockfish_path = shutil.which("stockfish")
-          if not stockfish_path:
-              print("❌ Stockfish introuvable")
-              exit(0)
+          # Choix du coup
+          move = None
+          if mode == "random":
+              move = random.choice(list(board.legal_moves))
+              print(f"🎲 Coup choisi au hasard: {move.uci()}")
+          else:
+              stockfish_path = shutil.which("stockfish")
+              if not stockfish_path:
+                  print("❌ Stockfish introuvable")
+                  exit(0)
+              engine = chess.engine.SimpleEngine.popen_uci(stockfish_path)
 
-          engine = chess.engine.SimpleEngine.popen_uci(stockfish_path)
-          engine.configure({"UCI_LimitStrength": True, "UCI_Elo": elo})
-          result = engine.play(board, chess.engine.Limit(time=1.0))
-          move = result.move
-          engine.quit()
+              if mode == "depth" and depth.isdigit():
+                  result = engine.play(board, chess.engine.Limit(depth=int(depth)))
+              else:
+                  engine.configure({"UCI_LimitStrength": True, "UCI_Elo": elo})
+                  result = engine.play(board, chess.engine.Limit(time=1.0))
 
-          print(f"🤖 Coup choisi par Stockfish Elo={elo}: {move.uci()}")
+              move = result.move
+              engine.quit()
+              print(f"🤖 Coup choisi par Stockfish: {move.uci()}")
+
           board.push(move)
 
           # Envoi à Lichess
@@ -128,10 +141,9 @@ jobs:
           if r.status_code != 200:
               exit(1)
 
-          # Sauvegarde FEN après coup
+          # Sauvegarde
           fen_after = board.fen()
           (data_dir / "position.fen").write_text(fen_after, encoding="utf-8")
-
           (data_dir / "dernier_coup.json").write_text(
               json.dumps({
                   "dernier_coup": move.uci(),
@@ -140,25 +152,7 @@ jobs:
               }, ensure_ascii=False, indent=2),
               encoding="utf-8"
           )
-
-          history_file = data_dir / "move_history.json"
-          history = []
-          if history_file.exists():
-              try:
-                  history = json.loads(history_file.read_text(encoding="utf-8"))
-                  if not isinstance(history, list):
-                      history = []
-              except Exception:
-                  history = []
-          history.append({
-              "couleur": "noir",
-              "coup": move.uci(),
-              "fen_apres": fen_after,
-              "horodatage": datetime.now(timezone.utc).isoformat()
-          })
-          history_file.write_text(json.dumps(history, ensure_ascii=False, indent=2), encoding="utf-8")
-
-          print("✅ position.fen, dernier_coup.json, move_history.json mis à jour")
+          print("✅ position.fen et dernier_coup.json mis à jour")
           PY
 
           python3 play_move.py
