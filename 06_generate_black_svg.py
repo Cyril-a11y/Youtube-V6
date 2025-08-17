@@ -142,7 +142,7 @@ historique_svg = ""
 for i, ligne in enumerate(historique_lignes):
     y = 370 + i * 34
     historique_svg += f"""
-    <text x="700" y="{y}" font-size="21" font-family="Ubuntu" fill="#333">
+    <text x="700" y="{y}" font-size="19" font-family="Ubuntu" fill="#333">
         {ligne}
     </text>"""
 
@@ -188,7 +188,7 @@ svg_final = f"""<?xml version="1.0" encoding="UTF-8" standalone="no"?>
     ➤ Choisissez le prochain coup !
   </text>
   <text x="700" y="280" font-size="22" font-family="Ubuntu" fill="#555">
-    ⌛ Tour : {tour}
+    ⏱ Tour : {tour}
   </text>
 
   <!-- Historique -->
