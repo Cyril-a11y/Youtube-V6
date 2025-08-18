@@ -68,12 +68,9 @@ jobs:
           # Sauvegarder JSON brut (debug/trace)
           echo "$GAME_JSON" > data/account_playing.json
 
-          # Extraire FEN + moves
+          # Extraire FEN
           GAME_FEN=$(echo "$GAME_JSON" | jq -r '.nowPlaying[] | select(.gameId=="'"$GAME_ID"'") | .fen')
-          GAME_MOVES=$(echo "$GAME_JSON" | jq -r '.nowPlaying[] | select(.gameId=="'"$GAME_ID"'") | .moves')
-
           echo "$GAME_FEN" > data/position_before_black.fen
-          echo "$GAME_MOVES" > data/moves_before_black.txt
 
           # Script Python pour jouer le coup noir
           cat > play_move.py <<'PY'
@@ -95,13 +92,16 @@ jobs:
 
           if board.is_game_over() or board.turn != chess.BLACK:
               print("⚠️ Partie terminée ou pas au tour des Noirs.")
-              exit(0)
+              raise SystemExit(0)
 
           # Choix du coup
           if mode == "random":
               move = random.choice(list(board.legal_moves))
           else:
               stockfish_path = shutil.which("stockfish")
+              if not stockfish_path:
+                  print("❌ Stockfish introuvable")
+                  raise SystemExit(1)
               engine = chess.engine.SimpleEngine.popen_uci(stockfish_path)
               if mode == "depth" and depth.isdigit():
                   result = engine.play(board, chess.engine.Limit(depth=int(depth)))
@@ -111,49 +111,69 @@ jobs:
               move = result.move
               engine.quit()
 
-          # ✅ Calcul SAN avant push
+          # Calcul SAN avant push (utile pour logs/affichage si besoin)
           san_move = board.san(move)
-          print(f"🤖 Coup choisi: {san_move} ({move.uci()})")
+          uci_move = move.uci()
+          print(f"🤖 Coup choisi: {san_move} ({uci_move})")
 
+          # Pousser le coup localement
           board.push(move)
 
           # Envoi à Lichess
-          url = f"https://lichess.org/api/bot/game/{game_id}/move/{move.uci()}"
+          url = f"https://lichess.org/api/bot/game/{game_id}/move/{uci_move}"
           headers = {"Authorization": f"Bearer {token}"}
           r = requests.post(url, headers=headers)
           print(f"📤 POST {url} -> {r.status_code} {r.text}")
           if r.status_code != 200:
-              exit(1)
+              raise SystemExit(1)
 
-          # Sauvegarde FEN + dernier coup
+          # Sauvegarde FEN + dernier coup lisible
           fen_after = board.fen()
           (data_dir / "position.fen").write_text(fen_after, encoding="utf-8")
           (data_dir / "dernier_coup.json").write_text(
               json.dumps({
-                  "dernier_coup": san_move,   # ✅ SAN lisible
+                  "dernier_coup": san_move,          # SAN lisible (utile pour l'UI)
                   "fen": fen_after,
                   "horodatage": datetime.now(timezone.utc).isoformat()
               }, ensure_ascii=False, indent=2),
               encoding="utf-8"
           )
 
-          # --- Mise à jour de move_history.json en SAN ---
+          # --- Mise à jour move_history.json : LISTE D'OBJETS ---
+          # Format attendu (ex côté blancs) :
+          # [
+          #   {"couleur":"blanc","coup":"e2e4","fen_apres":"...","horodatage":"..."},
+          #   {"couleur":"noir","coup":"g8f6","fen_apres":"...","horodatage":"..."},
+          #   ...
+          # ]
           history_file = data_dir / "move_history.json"
+          history = []
           if history_file.exists():
               try:
-                  history = json.loads(history_file.read_text(encoding="utf-8"))
+                  parsed = json.loads(history_file.read_text(encoding="utf-8"))
+                  if isinstance(parsed, list):
+                      # OK, format attendu
+                      history = parsed
+                  elif isinstance(parsed, dict) and "coups" in parsed:
+                      # Ancien format (liste de SAN) -> on le laisse de côté pour ne pas casser l'historique,
+                      # mais on repart sur une liste d'objets propre pour la suite
+                      pass
               except Exception:
-                  history = []
-          else:
-              history = []
+                  pass
 
-          history.append(san_move)  # ✅ on réutilise la variable du log
+          entry = {
+              "couleur": "noir",
+              "coup": uci_move,                 # UCI (cohérent avec ce que tu montres)
+              "fen_apres": fen_after,
+              "horodatage": datetime.now(timezone.utc).isoformat()
+          }
+          history.append(entry)
+
           history_file.write_text(
               json.dumps(history, ensure_ascii=False, indent=2),
               encoding="utf-8"
           )
-
-          print("✅ position.fen, dernier_coup.json et move_history.json mis à jour (SAN)")
+          print("✅ move_history.json mis à jour (objet noir UCI + FEN + horodatage)")
           PY
 
           python3 play_move.py
