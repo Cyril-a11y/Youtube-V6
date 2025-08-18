@@ -99,19 +99,27 @@ def nettoyer_et_corriger_san(commentaire: str) -> str:
 
     txt = _sans_accents(raw.lower())
 
-    # Expressions de roque en toutes lettres
+    # Expressions de roque
     if re.search(r"grand\s*roque|roque\s*long|cote\s*dame|rochade\s*longue", txt):
         return "O-O-O"
     if re.search(r"petit\s*roque|roque\s*court|cote\s*roi|rochade\s*courte", txt) or re.fullmatch(r"roque", txt):
         return "O-O"
 
-    # Traduction des initiales françaises vers SAN anglais
+    # Traduction initiales FR → SAN anglais
     trad = {"P": "", "T": "R", "C": "N", "F": "B", "D": "Q", "R": "K"}
     if raw and raw[0].upper() in trad:
         return trad[raw[0].upper()] + raw[1:]
 
-    # Sinon nettoyage basique (mais on conserve les lettres SAN anglaises)
-    cleaned = re.sub(r"[^a-hA-H1-8NBRQKx=+#]", "", raw)
+    # Cas spéciaux pions
+    if re.fullmatch(r"[a-h][1-8]", txt):
+        # ex: f4 → pion en f4
+        return txt
+    if re.fullmatch(r"[a-h]x[a-h][1-8]", txt):
+        # ex: fxe5 → pion prend en e5
+        return txt
+
+    # Sinon nettoyage basique
+    cleaned = re.sub(r"[^a-h1-8nbrqkx=+#]", "", txt)
     return cleaned
 
 def extraire_coups_valides(board, commentaires):
