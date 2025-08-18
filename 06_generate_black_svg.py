@@ -1,4 +1,4 @@
-# 06_generate_black_svg.py — affichage coup simplifié robuste
+# 06_generate_black_svg.py — affichage coup en français (SAN)
 
 import os
 import re
@@ -73,39 +73,23 @@ print("Dernier coup (UCI brut):", last_move_uci)
 # --- Reconstruction échiquier depuis FEN ---
 board = chess.Board(fen)
 
-# --- Conversion du dernier coup en notation simplifiée ---
-def uci_to_simple(board: chess.Board, uci: str) -> str:
+# --- Conversion UCI → SAN en français ---
+def uci_to_san_fr(board: chess.Board, uci: str) -> str:
+    if not uci:
+        return ""
     try:
-        if not uci:
-            return ""
-
-        # Gestion roques
-        if uci in ("e1g1", "e8g8"):
-            return "O-O"
-        if uci in ("e1c1", "e8c8"):
-            return "O-O-O"
-
         move = chess.Move.from_uci(uci)
-        piece = board.piece_at(move.from_square)
-        to_sq = chess.square_name(move.to_square)
-
-        if not piece:
-            return to_sq  # fallback minimal
-
-        mapping = {
-            chess.KING: "K",
-            chess.QUEEN: "Q",
-            chess.ROOK: "R",
-            chess.BISHOP: "B",
-            chess.KNIGHT: "N",
-            chess.PAWN: ""
-        }
-        letter = mapping.get(piece.piece_type, "")
-        return f"{letter}{to_sq}"
+        san = board.san(move)
+        # Traduction pièces en français
+        san = (san.replace("Q", "D")  # Queen → Dame
+                  .replace("N", "C")  # Knight → Cavalier
+                  .replace("R", "T")  # Rook → Tour
+                  .replace("B", "F")) # Bishop → Fou
+        return san
     except Exception as e:
         return f"(erreur: {e})"
 
-last_move_simple = uci_to_simple(board, last_move_uci) if last_move_uci else ""
+last_move_simple = uci_to_san_fr(board, last_move_uci) if last_move_uci else ""
 print("Dernier coup (affiché):", last_move_simple)
 
 # --- Historique ---
@@ -114,7 +98,11 @@ def load_history():
         return []
     try:
         data = json.loads(HISTORY_FILE.read_text(encoding="utf-8"))
-        return data.get("coups", [])
+        if isinstance(data, dict) and "coups" in data:
+            return data["coups"]
+        elif isinstance(data, list):
+            return data
+        return []
     except Exception:
         return []
 
