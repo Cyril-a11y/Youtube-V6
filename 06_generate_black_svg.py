@@ -1,4 +1,4 @@
-# 06_generate_black_svg.py — fusion lastMove+FEN & présentation historique
+# 06_generate_black_svg.py — fusion lastMove+FEN & présentation historique (corrigée)
 
 import os
 import re
@@ -85,17 +85,11 @@ def uci_to_french(board: chess.Board, uci: str) -> str:
     }
     try:
         move = chess.Move.from_uci(uci)
-        piece = board.piece_at(move.to_square)
+        piece = board.piece_at(move.from_square)  # ✅ on regarde la case de départ
         if not piece:
             return uci  # fallback brut
         piece_fr = mapping.get(piece.piece_type, "?")
-        # Capture ? On compare la position d’avant (si possible)
-        board_copy = board.copy(stack=False)
-        if board_copy.move_stack:
-            board_copy.pop()
-        captured = board_copy.piece_at(move.to_square)
-        capture_str = "x" if captured else ""
-        return f"{piece_fr}{capture_str}{chess.square_name(move.to_square)}"
+        return f"{piece_fr}{chess.square_name(move.to_square)}"
     except Exception as e:
         return f"(erreur: {e})"
 
