@@ -73,18 +73,27 @@ print("Dernier coup (UCI brut):", last_move_uci)
 # --- Reconstruction échiquier depuis FEN ---
 board = chess.Board(fen)
 
-# --- Conversion UCI → SAN en français ---
+# --- Conversion UCI → SAN en français (robuste même si coup déjà joué) ---
 def uci_to_san_fr(board: chess.Board, uci: str) -> str:
     if not uci:
         return ""
     try:
         move = chess.Move.from_uci(uci)
-        san = board.san(move)
+        tmp = board.copy()
+
+        # si le coup est légal dans la FEN actuelle
+        if move in tmp.legal_moves:
+            san = tmp.san(move)
+        else:
+            # sinon on pousse et on récupère SAN
+            tmp.push(move)
+            san = tmp.san(move)
+
         # Traduction pièces en français
-        san = (san.replace("Q", "D")  # Queen → Dame
-                  .replace("N", "C")  # Knight → Cavalier
-                  .replace("R", "T")  # Rook → Tour
-                  .replace("B", "F")) # Bishop → Fou
+        san = (san.replace("Q", "D")  # Dame
+                  .replace("N", "C")  # Cavalier
+                  .replace("R", "T")  # Tour
+                  .replace("B", "F")) # Fou
         return san
     except Exception as e:
         return f"(erreur: {e})"
