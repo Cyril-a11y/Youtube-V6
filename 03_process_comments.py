@@ -97,29 +97,30 @@ def nettoyer_et_corriger_san(commentaire: str) -> str:
                .replace("0-0-0", "O-O-O").replace("o-o-o", "O-O-O")
                .replace("0-0", "O-O").replace("o-o", "O-O"))
 
-    txt = _sans_accents(raw.lower())
+    txt = _sans_accents(raw)
 
     # Expressions de roque
-    if re.search(r"grand\s*roque|roque\s*long|cote\s*dame|rochade\s*longue", txt):
+    txt_lower = txt.lower()
+    if re.search(r"grand\s*roque|roque\s*long|cote\s*dame|rochade\s*longue", txt_lower):
         return "O-O-O"
-    if re.search(r"petit\s*roque|roque\s*court|cote\s*roi|rochade\s*courte", txt) or re.fullmatch(r"roque", txt):
+    if re.search(r"petit\s*roque|roque\s*court|cote\s*roi|rochade\s*courte", txt_lower) or re.fullmatch(r"roque", txt_lower):
         return "O-O"
 
-    # Traduction initiales FR → SAN anglais
+    # Traduction initiales FR → SAN anglais (uniquement si majuscule)
     trad = {"P": "", "T": "R", "C": "N", "F": "B", "D": "Q", "R": "K"}
-    if raw and raw[0].upper() in trad:
-        return trad[raw[0].upper()] + raw[1:]
+    if raw and raw[0].isupper() and raw[0] in trad:
+        return trad[raw[0]] + raw[1:]
 
     # Cas spéciaux pions
-    if re.fullmatch(r"[a-h][1-8]", txt):
+    if re.fullmatch(r"[a-h][1-8]", txt_lower):
         # ex: f4 → pion en f4
-        return txt
-    if re.fullmatch(r"[a-h]x[a-h][1-8]", txt):
+        return txt_lower
+    if re.fullmatch(r"[a-h]x[a-h][1-8]", txt_lower):
         # ex: fxe5 → pion prend en e5
-        return txt
+        return txt_lower
 
     # Sinon nettoyage basique
-    cleaned = re.sub(r"[^a-h1-8nbrqkx=+#]", "", txt)
+    cleaned = re.sub(r"[^a-h1-8nbrqkx=+#]", "", txt_lower)
     return cleaned
 
 def extraire_coups_valides(board, commentaires):
