@@ -1,4 +1,4 @@
-# 06_generate_black_svg.py — version lastMove + FEN uniquement
+# 06_generate_black_svg.py — version lastMove + FEN uniquement (corrigée)
 
 import os
 import re
@@ -72,24 +72,35 @@ print("Dernier coup (UCI brut):", last_move_uci)
 board = chess.Board(fen)
 
 # --- Conversion du dernier coup en notation française ---
-def san_to_french(san: str) -> str:
-    mapping = {"K": "R", "Q": "D", "R": "T", "B": "F", "N": "C"}  # roi, dame, tour, fou, cavalier
-    for eng, fr in mapping.items():
-        san = san.replace(eng, fr)
-    return san
-
-last_move_fr = ""
-if last_move_uci:
+def uci_to_french(board: chess.Board, uci: str) -> str:
+    mapping = {
+        chess.KING: "R",
+        chess.QUEEN: "D",
+        chess.ROOK: "T",
+        chess.BISHOP: "F",
+        chess.KNIGHT: "C",
+        chess.PAWN: ""
+    }
     try:
-        move = chess.Move.from_uci(last_move_uci)
-        # on recrée la position avant le coup
-        board_before = chess.Board(fen)
-        board_before.pop()  # revient au coup précédent
-        last_san = board_before.san(move)  # ex: Qc3
-        last_move_fr = san_to_french(last_san)  # ex: Dc3
+        move = chess.Move.from_uci(uci)
+        piece = board.piece_at(move.to_square)
+        if not piece:
+            return uci  # fallback brut
+        piece_fr = mapping.get(piece.piece_type, "?")
+        # Si c'était une capture, ajouter "x"
+        # Pour le savoir : il faut vérifier la case d'arrivée dans la position AVANT le coup
+        board_before = board.copy(stack=False)
+        # tentative d'annuler le coup pour récupérer la position avant
+        # (si la partie a un historique)
+        if board_before.move_stack:
+            board_before.pop()
+        captured = board_before.piece_at(move.to_square)
+        capture_str = "x" if captured else ""
+        return f"{piece_fr}{capture_str}{chess.square_name(move.to_square)}"
     except Exception as e:
-        print("❌ Erreur conversion SAN:", e)
+        return f"(erreur: {e})"
 
+last_move_fr = uci_to_french(board, last_move_uci) if last_move_uci else ""
 print("Dernier coup (FR):", last_move_fr)
 
 # --- Génération échiquier SVG ---
