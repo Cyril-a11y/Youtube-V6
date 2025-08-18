@@ -90,14 +90,8 @@ jobs:
           depth = os.environ.get("BOT_DEPTH", "")
 
           fen_path = data_dir / "position_before_black.fen"
-          moves_path = data_dir / "moves_before_black.txt"
           fen = fen_path.read_text(encoding="utf-8").strip()
-          moves = moves_path.read_text(encoding="utf-8").strip().split()
-
           board = chess.Board(fen)
-
-          print("📜 Historique des coups (UCI):", " ".join(moves))
-          print("FEN serveur:", fen)
 
           if board.is_game_over() or board.turn != chess.BLACK:
               print("⚠️ Partie terminée ou pas au tour des Noirs.")
@@ -106,12 +100,8 @@ jobs:
           # Choix du coup
           if mode == "random":
               move = random.choice(list(board.legal_moves))
-              print(f"🎲 Coup choisi au hasard: {board.san(move)} ({move.uci()})")
           else:
               stockfish_path = shutil.which("stockfish")
-              if not stockfish_path:
-                  print("❌ Stockfish introuvable")
-                  exit(0)
               engine = chess.engine.SimpleEngine.popen_uci(stockfish_path)
               if mode == "depth" and depth.isdigit():
                   result = engine.play(board, chess.engine.Limit(depth=int(depth)))
@@ -120,7 +110,10 @@ jobs:
                   result = engine.play(board, chess.engine.Limit(time=1.0))
               move = result.move
               engine.quit()
-              print(f"🤖 Coup choisi par Stockfish: {board.san(move)} ({move.uci()})")
+
+          # ✅ Calcul SAN avant push
+          san_move = board.san(move)
+          print(f"🤖 Coup choisi: {san_move} ({move.uci()})")
 
           board.push(move)
 
@@ -137,7 +130,7 @@ jobs:
           (data_dir / "position.fen").write_text(fen_after, encoding="utf-8")
           (data_dir / "dernier_coup.json").write_text(
               json.dumps({
-                  "dernier_coup": board.san(move),   # ✅ SAN lisible
+                  "dernier_coup": san_move,   # ✅ SAN lisible
                   "fen": fen_after,
                   "horodatage": datetime.now(timezone.utc).isoformat()
               }, ensure_ascii=False, indent=2),
@@ -154,7 +147,7 @@ jobs:
           else:
               history = []
 
-          history.append(board.san(move))
+          history.append(san_move)  # ✅ on réutilise la variable du log
           history_file.write_text(
               json.dumps(history, ensure_ascii=False, indent=2),
               encoding="utf-8"
