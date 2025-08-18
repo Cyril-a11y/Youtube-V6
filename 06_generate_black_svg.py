@@ -1,4 +1,4 @@
-# 06_generate_black_svg.py — fusion lastMove+FEN & présentation historique (corrigée)
+# 06_generate_black_svg.py — fusion lastMove+FEN & présentation historique (corrigée, affichage coup simplifié)
 
 import os
 import re
@@ -73,28 +73,41 @@ print("Dernier coup (UCI brut):", last_move_uci)
 # --- Reconstruction échiquier depuis FEN ---
 board = chess.Board(fen)
 
-# --- Conversion du dernier coup en notation française ---
-def uci_to_french(board: chess.Board, uci: str) -> str:
+# --- Conversion du dernier coup en notation simplifiée ---
+def uci_to_simple(board: chess.Board, uci: str) -> str:
     mapping = {
-        chess.KING: "R",
-        chess.QUEEN: "D",
-        chess.ROOK: "T",
-        chess.BISHOP: "F",
-        chess.KNIGHT: "C",
+        chess.KING: "K",
+        chess.QUEEN: "Q",
+        chess.ROOK: "R",
+        chess.BISHOP: "B",
+        chess.KNIGHT: "N",
         chess.PAWN: ""
     }
     try:
         move = chess.Move.from_uci(uci)
-        piece = board.piece_at(move.from_square)  # ✅ on regarde la case de départ
+
+        # Gestion roques avec SAN
+        san = board.san(move)
+        if san in ("O-O", "O-O-O"):
+            return san
+
+        piece = board.piece_at(move.from_square)
         if not piece:
             return uci  # fallback brut
-        piece_fr = mapping.get(piece.piece_type, "?")
-        return f"{piece_fr}{chess.square_name(move.to_square)}"
+
+        piece_letter = mapping.get(piece.piece_type, "?")
+        to_sq = chess.square_name(move.to_square)
+
+        # Pions → uniquement case d’arrivée
+        if piece.piece_type == chess.PAWN:
+            return to_sq
+        else:
+            return f"{piece_letter}{to_sq}"
     except Exception as e:
         return f"(erreur: {e})"
 
-last_move_fr = uci_to_french(board, last_move_uci) if last_move_uci else ""
-print("Dernier coup (FR):", last_move_fr)
+last_move_simple = uci_to_simple(board, last_move_uci) if last_move_uci else ""
+print("Dernier coup (affiché):", last_move_simple)
 
 # --- Historique (ici depuis fichier JSON pour l’exemple) ---
 def load_history():
@@ -172,7 +185,7 @@ svg_final = f"""<?xml version="1.0" encoding="UTF-8" standalone="no"?>
 
   <!-- Infos partie -->
   <text x="700" y="180" font-size="26" font-family="Ubuntu" fill="#111">
-    Dernier coup : {last_move_fr if last_move_fr else "(aucun)"}
+    Dernier coup : {last_move_simple if last_move_simple else "(aucun)"}
   </text>
   <text x="700" y="230" font-size="28" font-family="Ubuntu" fill="#111">
     ➤ Choisissez le prochain coup !
