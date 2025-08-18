@@ -1,7 +1,8 @@
-# 06_generate_black_svg.py — version lastMove + FEN uniquement (corrigée)
+# 06_generate_black_svg.py — fusion lastMove+FEN & présentation historique
 
 import os
 import re
+import json
 import chess
 import requests
 import chess.svg
@@ -13,6 +14,7 @@ DATA_DIR = Path("data")
 SVG_FILE = DATA_DIR / "thumbnail_black.svg"
 PNG_FILE = DATA_DIR / "thumbnail_black.png"
 BOT_ELO_FILE = DATA_DIR / "bot_elo.txt"
+HISTORY_FILE = DATA_DIR / "dernier_coup.json"
 
 # --- Lecture Elo du bot (obligatoire, sans fallback) ---
 if not BOT_ELO_FILE.exists():
@@ -87,14 +89,11 @@ def uci_to_french(board: chess.Board, uci: str) -> str:
         if not piece:
             return uci  # fallback brut
         piece_fr = mapping.get(piece.piece_type, "?")
-        # Si c'était une capture, ajouter "x"
-        # Pour le savoir : il faut vérifier la case d'arrivée dans la position AVANT le coup
-        board_before = board.copy(stack=False)
-        # tentative d'annuler le coup pour récupérer la position avant
-        # (si la partie a un historique)
-        if board_before.move_stack:
-            board_before.pop()
-        captured = board_before.piece_at(move.to_square)
+        # Capture ? On compare la position d’avant (si possible)
+        board_copy = board.copy(stack=False)
+        if board_copy.move_stack:
+            board_copy.pop()
+        captured = board_copy.piece_at(move.to_square)
         capture_str = "x" if captured else ""
         return f"{piece_fr}{capture_str}{chess.square_name(move.to_square)}"
     except Exception as e:
@@ -102,6 +101,49 @@ def uci_to_french(board: chess.Board, uci: str) -> str:
 
 last_move_fr = uci_to_french(board, last_move_uci) if last_move_uci else ""
 print("Dernier coup (FR):", last_move_fr)
+
+# --- Historique (ici depuis fichier JSON pour l’exemple) ---
+def load_history():
+    if not HISTORY_FILE.exists():
+        return []
+    try:
+        data = json.loads(HISTORY_FILE.read_text(encoding="utf-8"))
+        return data.get("coups", [])
+    except Exception:
+        return []
+
+moves_list = load_history()
+
+# --- Historique formaté (même présentation qu’avant) ---
+def format_history_lines(moves):
+    lignes = []
+    for i in range(0, len(moves), 2):  # chaque tour = 2 demi-coups
+        num = (i // 2) + 1
+        bloc = moves[i:i+2]
+        if len(bloc) == 1:
+            lignes.append(f'<tspan fill="red" font-weight="bold">{num}.</tspan> {bloc[0]}')
+        else:
+            lignes.append(f'<tspan fill="red" font-weight="bold">{num}.</tspan> {bloc[0]} {bloc[1]}')
+    # retour à la ligne toutes les 4 paires de coups (8 demi-coups)
+    lignes_split = []
+    for j in range(0, len(lignes), 4):
+        lignes_split.append(" ".join(lignes[j:j+4]))
+    return lignes_split
+
+if not moves_list:
+    historique_lignes = ["(aucun coup pour le moment)"]
+else:
+    historique_lignes = format_history_lines(moves_list)
+
+historique_svg = ""
+for i, ligne in enumerate(historique_lignes):
+    y = 370 + i * 34
+    historique_svg += f"""
+    <text x="700" y="{y}" font-size="18" font-family="Ubuntu" fill="#333">
+        {ligne}
+    </text>"""
+
+tour = (len(moves_list) // 2) + 1
 
 # --- Génération échiquier SVG ---
 svg_echiquier = chess.svg.board(
@@ -141,6 +183,16 @@ svg_final = f"""<?xml version="1.0" encoding="UTF-8" standalone="no"?>
   <text x="700" y="230" font-size="28" font-family="Ubuntu" fill="#111">
     ➤ Choisissez le prochain coup !
   </text>
+  <text x="700" y="280" font-size="22" font-family="Ubuntu" fill="#555">
+    Tour : {tour}
+  </text>
+
+  <!-- Historique -->
+  <rect x="680" y="295" width="540" height="340" fill="#fff" stroke="#d1d5db" stroke-width="1" rx="8" ry="8"/>
+  <text x="700" y="330" font-size="24" font-family="Ubuntu" fill="#1f2937" font-weight="bold">
+    ☰ Historique des coups :
+  </text>
+  {historique_svg}
 
   <!-- Footer -->
   <text x="750" y="700" font-size="25" font-family="Ubuntu" fill="#1f2937" font-weight="bold">
