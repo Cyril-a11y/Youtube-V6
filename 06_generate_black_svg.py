@@ -1,4 +1,4 @@
-# 06_generate_black_svg.py — affichage coup en français (SAN)
+# 06_generate_black_svg.py — affichage dernier coup en UCI brut
 
 import os
 import re
@@ -73,34 +73,6 @@ print("Dernier coup (UCI brut):", last_move_uci)
 # --- Reconstruction échiquier depuis FEN ---
 board = chess.Board(fen)
 
-# --- Conversion UCI → SAN en français (robuste même si coup déjà joué) ---
-def uci_to_san_fr(board: chess.Board, uci: str) -> str:
-    if not uci:
-        return ""
-    try:
-        move = chess.Move.from_uci(uci)
-        tmp = board.copy()
-
-        # si le coup est légal dans la FEN actuelle
-        if move in tmp.legal_moves:
-            san = tmp.san(move)
-        else:
-            # sinon on pousse et on récupère SAN
-            tmp.push(move)
-            san = tmp.san(move)
-
-        # Traduction pièces en français
-        san = (san.replace("Q", "D")  # Dame
-                  .replace("N", "C")  # Cavalier
-                  .replace("R", "T")  # Tour
-                  .replace("B", "F")) # Fou
-        return san
-    except Exception as e:
-        return f"(erreur: {e})"
-
-last_move_simple = uci_to_san_fr(board, last_move_uci) if last_move_uci else ""
-print("Dernier coup (affiché):", last_move_simple)
-
 # --- Historique ---
 def load_history():
     if not HISTORY_FILE.exists():
@@ -172,7 +144,7 @@ svg_final = f"""<?xml version="1.0" encoding="UTF-8" standalone="no"?>
     {svg_echiquier}
   </g>
   <text x="700" y="180" font-size="26" font-family="Ubuntu" fill="#111">
-    Dernier coup : {last_move_simple if last_move_simple else "(aucun)"}
+    Dernier coup : {last_move_uci if last_move_uci else "(aucun)"}
   </text>
   <text x="700" y="230" font-size="28" font-family="Ubuntu" fill="#111">
     ➤ Choisissez le prochain coup !
