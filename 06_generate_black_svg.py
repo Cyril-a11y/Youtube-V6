@@ -1,4 +1,4 @@
-# 06_generate_black_svg.py — fusion lastMove+FEN & présentation historique (corrigée, affichage coup simplifié)
+# 06_generate_black_svg.py — affichage coup simplifié robuste
 
 import os
 import re
@@ -75,41 +75,40 @@ board = chess.Board(fen)
 
 # --- Conversion du dernier coup en notation simplifiée ---
 def uci_to_simple(board: chess.Board, uci: str) -> str:
-    mapping = {
-        chess.KING: "K",
-        chess.QUEEN: "Q",
-        chess.ROOK: "R",
-        chess.BISHOP: "B",
-        chess.KNIGHT: "N",
-        chess.PAWN: ""
-    }
     try:
+        if not uci:
+            return ""
+
+        # Gestion roques
+        if uci in ("e1g1", "e8g8"):
+            return "O-O"
+        if uci in ("e1c1", "e8c8"):
+            return "O-O-O"
+
         move = chess.Move.from_uci(uci)
-
-        # Gestion roques avec SAN
-        san = board.san(move)
-        if san in ("O-O", "O-O-O"):
-            return san
-
         piece = board.piece_at(move.from_square)
-        if not piece:
-            return uci  # fallback brut
-
-        piece_letter = mapping.get(piece.piece_type, "?")
         to_sq = chess.square_name(move.to_square)
 
-        # Pions → uniquement case d’arrivée
-        if piece.piece_type == chess.PAWN:
-            return to_sq
-        else:
-            return f"{piece_letter}{to_sq}"
+        if not piece:
+            return to_sq  # fallback minimal
+
+        mapping = {
+            chess.KING: "K",
+            chess.QUEEN: "Q",
+            chess.ROOK: "R",
+            chess.BISHOP: "B",
+            chess.KNIGHT: "N",
+            chess.PAWN: ""
+        }
+        letter = mapping.get(piece.piece_type, "")
+        return f"{letter}{to_sq}"
     except Exception as e:
         return f"(erreur: {e})"
 
 last_move_simple = uci_to_simple(board, last_move_uci) if last_move_uci else ""
 print("Dernier coup (affiché):", last_move_simple)
 
-# --- Historique (ici depuis fichier JSON pour l’exemple) ---
+# --- Historique ---
 def load_history():
     if not HISTORY_FILE.exists():
         return []
@@ -121,17 +120,15 @@ def load_history():
 
 moves_list = load_history()
 
-# --- Historique formaté (même présentation qu’avant) ---
 def format_history_lines(moves):
     lignes = []
-    for i in range(0, len(moves), 2):  # chaque tour = 2 demi-coups
+    for i in range(0, len(moves), 2):
         num = (i // 2) + 1
         bloc = moves[i:i+2]
         if len(bloc) == 1:
             lignes.append(f'<tspan fill="red" font-weight="bold">{num}.</tspan> {bloc[0]}')
         else:
             lignes.append(f'<tspan fill="red" font-weight="bold">{num}.</tspan> {bloc[0]} {bloc[1]}')
-    # retour à la ligne toutes les 4 paires de coups (8 demi-coups)
     lignes_split = []
     for j in range(0, len(lignes), 4):
         lignes_split.append(" ".join(lignes[j:j+4]))
@@ -161,13 +158,10 @@ svg_echiquier = chess.svg.board(
 )
 svg_echiquier = _force_board_colors(svg_echiquier)
 
-# --- Construction SVG esthétique complet ---
+# --- Construction SVG complet ---
 svg_final = f"""<?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <svg width="1280" height="720" xmlns="http://www.w3.org/2000/svg">
-  <!-- Fond général -->
   <rect width="100%" height="100%" fill="#f9fafb"/>
-
-  <!-- Titre et instructions -->
   <text x="75%" y="60" text-anchor="middle" font-size="35" font-family="Ubuntu" fill="#1f2937">
     ♟️ Partie Interactive !
   </text>
@@ -177,13 +171,9 @@ svg_final = f"""<?xml version="1.0" encoding="UTF-8" standalone="no"?>
   <text x="700" y="135" font-size="22" font-family="Ubuntu" fill="#1f2937">
     2. Le coup majoritaire sera joué automatiquement !
   </text>
-
-  <!-- Échiquier -->
   <g transform="translate(40,50)">
     {svg_echiquier}
   </g>
-
-  <!-- Infos partie -->
   <text x="700" y="180" font-size="26" font-family="Ubuntu" fill="#111">
     Dernier coup : {last_move_simple if last_move_simple else "(aucun)"}
   </text>
@@ -193,20 +183,14 @@ svg_final = f"""<?xml version="1.0" encoding="UTF-8" standalone="no"?>
   <text x="700" y="280" font-size="22" font-family="Ubuntu" fill="#555">
     Tour : {tour}
   </text>
-
-  <!-- Historique -->
   <rect x="680" y="295" width="540" height="340" fill="#fff" stroke="#d1d5db" stroke-width="1" rx="8" ry="8"/>
   <text x="700" y="330" font-size="24" font-family="Ubuntu" fill="#1f2937" font-weight="bold">
     ☰ Historique des coups :
   </text>
   {historique_svg}
-
-  <!-- Footer -->
   <text x="750" y="700" font-size="25" font-family="Ubuntu" fill="#1f2937" font-weight="bold">
     Chaîne YOUTUBE : PriseEnPassant
   </text>
-
-  <!-- Légende joueurs -->
   <text x="50" y="40" font-size="22" font-family="Ubuntu" fill="#1f2937">
     ♟️ {NOM_NOIRS}
   </text>
@@ -219,7 +203,6 @@ svg_final = f"""<?xml version="1.0" encoding="UTF-8" standalone="no"?>
 SVG_FILE.write_text(svg_final, encoding="utf-8")
 print(f"✅ SVG généré : {SVG_FILE}")
 
-# --- Conversion PNG robuste ---
 try:
     cairosvg.svg2png(bytestring=svg_final.encode("utf-8"), write_to=str(PNG_FILE))
     print(f"✅ PNG miniature générée : {PNG_FILE}")
