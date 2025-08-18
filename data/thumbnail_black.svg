@@ -28,7 +28,7 @@ R N B Q K B N R</pre></desc><defs><g id="white-pawn" class="white pawn"><path d=
 
   <!-- Infos partie -->
   <text x="700" y="180" font-size="26" font-family="Ubuntu" fill="#111">
-    Dernier coup : (aucun)
+    Dernier coup : Cxb4
   </text>
   <text x="700" y="230" font-size="28" font-family="Ubuntu" fill="#111">
     ➤ Choisissez le prochain coup !
