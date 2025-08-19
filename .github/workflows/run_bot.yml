@@ -111,7 +111,7 @@ jobs:
               move = result.move
               engine.quit()
 
-          # Calcul SAN avant push (utile pour logs/affichage si besoin)
+          # Calcul SAN avant push (utile pour logs/affichage)
           san_move = board.san(move)
           uci_move = move.uci()
           print(f"🤖 Coup choisi: {san_move} ({uci_move})")
@@ -132,40 +132,54 @@ jobs:
           (data_dir / "position.fen").write_text(fen_after_local, encoding="utf-8")
           (data_dir / "dernier_coup.json").write_text(
               json.dumps({
-                  "dernier_coup": san_move,          # SAN lisible (UI)
+                  "dernier_coup": san_move,
                   "fen": fen_after_local,
                   "horodatage": datetime.now(timezone.utc).isoformat()
               }, ensure_ascii=False, indent=2),
               encoding="utf-8"
           )
 
-          # === NOUVEAU : vérification via /api/account/playing (source de vérité) ===
-          # Respecte ta règle : lecture état via account/playing pour historiser
+          # === Lecture via /api/account/playing ===
+          last_move_api, fen_api = None, None
           try:
               ap = requests.get(
                   "https://lichess.org/api/account/playing",
                   headers={"Authorization": f"Bearer {token}"},
                   timeout=15
               )
+              print(f"📥 GET /api/account/playing -> {ap.status_code}")
               if ap.status_code == 200:
                   j = ap.json()
-                  target = None
-                  for g in j.get("nowPlaying", []):
+                  now_playing = j.get("nowPlaying", [])
+                  print("DEBUG nowPlaying:", json.dumps(now_playing, indent=2, ensure_ascii=False))
+
+                  for g in now_playing:
                       if g.get("gameId") == game_id:
-                          target = g
+                          print(f"✅ Partie trouvée (gameId={game_id})")
+                          last_move_api = g.get("lastMove")
+                          fen_api = g.get("fen")
+                          print(f"   ↳ lastMove = {last_move_api}, fen = {fen_api[:40]}...")
                           break
-                  last_move_api = (target or {}).get("lastMove") or uci_move
-                  fen_api = (target or {}).get("fen") or fen_after_local
+
+                  if not last_move_api:
+                      if now_playing:
+                          print(f"⚠️ gameId {game_id} non trouvé, parties actives détectées: {[g.get('gameId') for g in now_playing]}")
+                      else:
+                          print("⚠️ Aucune partie active détectée dans account/playing")
               else:
                   print(f"⚠️ account/playing {ap.status_code}: {ap.text[:120]}")
-                  last_move_api = uci_move
-                  fen_api = fen_after_local
           except Exception as e:
-              print(f"⚠️ Exception account/playing: {e}")
+              print(f"⚠️ Exception lors du GET /api/account/playing: {e}")
+
+          # Fallback si rien trouvé
+          if not last_move_api:
+              print("⚠️ Fallback: utilisation du coup local uci_move")
               last_move_api = uci_move
+          if not fen_api:
+              print("⚠️ Fallback: utilisation de la FEN locale")
               fen_api = fen_after_local
 
-          # --- Mise à jour move_history.json : LISTE D'OBJETS ---
+          # --- Mise à jour move_history.json ---
           history_file = data_dir / "move_history.json"
           history = []
           if history_file.exists():
@@ -173,16 +187,12 @@ jobs:
                   parsed = json.loads(history_file.read_text(encoding="utf-8"))
                   if isinstance(parsed, list):
                       history = parsed
-                  elif isinstance(parsed, dict) and "coups" in parsed:
-                      # Ancien format possible : on n'écrase pas,
-                      # mais on continue en liste d'objets propre.
-                      pass
               except Exception:
                   pass
 
           entry = {
               "couleur": "noir",
-              "coup": last_move_api,        # UCI confirmé via account/playing
+              "coup": last_move_api,
               "fen_apres": fen_api,
               "horodatage": datetime.now(timezone.utc).isoformat()
           }
@@ -192,7 +202,7 @@ jobs:
               json.dumps(history, ensure_ascii=False, indent=2),
               encoding="utf-8"
           )
-          print("✅ move_history.json mis à jour (noir, UCI account/playing, FEN, horodatage)")
+          print("✅ move_history.json mis à jour (coup noir consigné)")
           PY
 
           python3 play_move.py
