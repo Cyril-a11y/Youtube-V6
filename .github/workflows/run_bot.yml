@@ -127,44 +127,63 @@ jobs:
           if r.status_code != 200:
               raise SystemExit(1)
 
-          # Sauvegarde FEN + dernier coup lisible
-          fen_after = board.fen()
-          (data_dir / "position.fen").write_text(fen_after, encoding="utf-8")
+          # Sauvegarde FEN + dernier coup lisible (local)
+          fen_after_local = board.fen()
+          (data_dir / "position.fen").write_text(fen_after_local, encoding="utf-8")
           (data_dir / "dernier_coup.json").write_text(
               json.dumps({
-                  "dernier_coup": san_move,          # SAN lisible (utile pour l'UI)
-                  "fen": fen_after,
+                  "dernier_coup": san_move,          # SAN lisible (UI)
+                  "fen": fen_after_local,
                   "horodatage": datetime.now(timezone.utc).isoformat()
               }, ensure_ascii=False, indent=2),
               encoding="utf-8"
           )
 
+          # === NOUVEAU : vérification via /api/account/playing (source de vérité) ===
+          # Respecte ta règle : lecture état via account/playing pour historiser
+          try:
+              ap = requests.get(
+                  "https://lichess.org/api/account/playing",
+                  headers={"Authorization": f"Bearer {token}"},
+                  timeout=15
+              )
+              if ap.status_code == 200:
+                  j = ap.json()
+                  target = None
+                  for g in j.get("nowPlaying", []):
+                      if g.get("gameId") == game_id:
+                          target = g
+                          break
+                  last_move_api = (target or {}).get("lastMove") or uci_move
+                  fen_api = (target or {}).get("fen") or fen_after_local
+              else:
+                  print(f"⚠️ account/playing {ap.status_code}: {ap.text[:120]}")
+                  last_move_api = uci_move
+                  fen_api = fen_after_local
+          except Exception as e:
+              print(f"⚠️ Exception account/playing: {e}")
+              last_move_api = uci_move
+              fen_api = fen_after_local
+
           # --- Mise à jour move_history.json : LISTE D'OBJETS ---
-          # Format attendu (ex côté blancs) :
-          # [
-          #   {"couleur":"blanc","coup":"e2e4","fen_apres":"...","horodatage":"..."},
-          #   {"couleur":"noir","coup":"g8f6","fen_apres":"...","horodatage":"..."},
-          #   ...
-          # ]
           history_file = data_dir / "move_history.json"
           history = []
           if history_file.exists():
               try:
                   parsed = json.loads(history_file.read_text(encoding="utf-8"))
                   if isinstance(parsed, list):
-                      # OK, format attendu
                       history = parsed
                   elif isinstance(parsed, dict) and "coups" in parsed:
-                      # Ancien format (liste de SAN) -> on le laisse de côté pour ne pas casser l'historique,
-                      # mais on repart sur une liste d'objets propre pour la suite
+                      # Ancien format possible : on n'écrase pas,
+                      # mais on continue en liste d'objets propre.
                       pass
               except Exception:
                   pass
 
           entry = {
               "couleur": "noir",
-              "coup": uci_move,                 # UCI (cohérent avec ce que tu montres)
-              "fen_apres": fen_after,
+              "coup": last_move_api,        # UCI confirmé via account/playing
+              "fen_apres": fen_api,
               "horodatage": datetime.now(timezone.utc).isoformat()
           }
           history.append(entry)
@@ -173,7 +192,7 @@ jobs:
               json.dumps(history, ensure_ascii=False, indent=2),
               encoding="utf-8"
           )
-          print("✅ move_history.json mis à jour (objet noir UCI + FEN + horodatage)")
+          print("✅ move_history.json mis à jour (noir, UCI account/playing, FEN, horodatage)")
           PY
 
           python3 play_move.py
