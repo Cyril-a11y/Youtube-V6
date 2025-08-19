@@ -111,7 +111,7 @@ jobs:
               move = result.move
               engine.quit()
 
-          # Calcul SAN avant push (utile pour logs/affichage)
+          # Calcul SAN avant push
           san_move = board.san(move)
           uci_move = move.uci()
           print(f"🤖 Coup choisi: {san_move} ({uci_move})")
@@ -127,7 +127,7 @@ jobs:
           if r.status_code != 200:
               raise SystemExit(1)
 
-          # Sauvegarde FEN + dernier coup lisible (local)
+          # Sauvegarde FEN + dernier coup lisible
           fen_after_local = board.fen()
           (data_dir / "position.fen").write_text(fen_after_local, encoding="utf-8")
           (data_dir / "dernier_coup.json").write_text(
@@ -139,7 +139,7 @@ jobs:
               encoding="utf-8"
           )
 
-          # === Lecture via /api/account/playing ===
+          # Lecture via /api/account/playing
           last_move_api, fen_api = None, None
           try:
               ap = requests.get(
@@ -152,7 +152,6 @@ jobs:
                   j = ap.json()
                   now_playing = j.get("nowPlaying", [])
                   print("DEBUG nowPlaying:", json.dumps(now_playing, indent=2, ensure_ascii=False))
-
                   for g in now_playing:
                       if g.get("gameId") == game_id:
                           print(f"✅ Partie trouvée (gameId={game_id})")
@@ -160,26 +159,15 @@ jobs:
                           fen_api = g.get("fen")
                           print(f"   ↳ lastMove = {last_move_api}, fen = {fen_api[:40]}...")
                           break
-
-                  if not last_move_api:
-                      if now_playing:
-                          print(f"⚠️ gameId {game_id} non trouvé, parties actives détectées: {[g.get('gameId') for g in now_playing]}")
-                      else:
-                          print("⚠️ Aucune partie active détectée dans account/playing")
-              else:
-                  print(f"⚠️ account/playing {ap.status_code}: {ap.text[:120]}")
           except Exception as e:
               print(f"⚠️ Exception lors du GET /api/account/playing: {e}")
 
-          # Fallback si rien trouvé
           if not last_move_api:
-              print("⚠️ Fallback: utilisation du coup local uci_move")
               last_move_api = uci_move
           if not fen_api:
-              print("⚠️ Fallback: utilisation de la FEN locale")
               fen_api = fen_after_local
 
-          # --- Mise à jour move_history.json ---
+          # Mise à jour move_history.json (comme avant)
           history_file = data_dir / "move_history.json"
           history = []
           if history_file.exists():
@@ -197,12 +185,18 @@ jobs:
               "horodatage": datetime.now(timezone.utc).isoformat()
           }
           history.append(entry)
-
           history_file.write_text(
               json.dumps(history, ensure_ascii=False, indent=2),
               encoding="utf-8"
           )
           print("✅ move_history.json mis à jour (coup noir consigné)")
+
+          # --- Nouveau : enregistrement parallèle dans historique.txt ---
+          hist_txt = data_dir / "historique.txt"
+          line = f"[{datetime.now(timezone.utc).isoformat()}] Noir joue {last_move_api} → {fen_api}\n"
+          with open(hist_txt, "a", encoding="utf-8") as f:
+              f.write(line)
+          print("✅ historique.txt mis à jour (coup noir ajouté)")
           PY
 
           python3 play_move.py
@@ -213,6 +207,6 @@ jobs:
           git config user.name "github-actions"
           git config user.email "actions@github.com"
           git pull --rebase origin main || true
-          git add data/position.fen data/dernier_coup.json data/move_history.json data/bot_elo.txt || true
+          git add data/position.fen data/dernier_coup.json data/move_history.json data/historique.txt data/bot_elo.txt || true
           git diff --cached --quiet || git commit -m "MAJ après coup noir"
           git push --force-with-lease origin main || true
