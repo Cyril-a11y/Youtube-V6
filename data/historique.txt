@@ -2,3 +2,4 @@
 20. Kd7 Kd7
 21. e7f8 Kd8
 22. e1g1 Kd7
+23. h8f6 Ke8
