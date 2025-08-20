@@ -94,7 +94,33 @@ jobs:
               print("⚠️ Partie terminée ou pas au tour des Noirs.")
               raise SystemExit(0)
 
-          # Choix du coup
+          # --- Récupérer le dernier coup blanc AVANT de jouer ---
+          last_white_move = None
+          try:
+              ap = requests.get(
+                  "https://lichess.org/api/account/playing",
+                  headers={"Authorization": f"Bearer {token}"},
+                  timeout=15
+              )
+              if ap.status_code == 200:
+                  j = ap.json()
+                  for g in j.get("nowPlaying", []):
+                      if g.get("gameId") == game_id:
+                          last_white_move = g.get("lastMove")
+                          break
+          except Exception as e:
+              print(f"⚠️ Impossible de récupérer le dernier coup blanc: {e}")
+
+          white_san = None
+          if last_white_move:
+              try:
+                  last_move_obj = chess.Move.from_uci(last_white_move)
+                  tmp_board = chess.Board(fen)  # position avant le coup noir
+                  white_san = tmp_board.san(last_move_obj)
+              except Exception:
+                  white_san = last_white_move
+
+          # === Choix du coup noir ===
           if mode == "random":
               move = random.choice(list(board.legal_moves))
           else:
@@ -111,7 +137,7 @@ jobs:
               move = result.move
               engine.quit()
 
-          # Calcul SAN avant push
+          # Calcul SAN du coup noir
           san_move = board.san(move)
           uci_move = move.uci()
           print(f"🤖 Coup choisi: {san_move} ({uci_move})")
@@ -139,34 +165,7 @@ jobs:
               encoding="utf-8"
           )
 
-          # Lecture du dernier coup blanc via API
-          last_white_move = None
-          try:
-              ap = requests.get(
-                  "https://lichess.org/api/account/playing",
-                  headers={"Authorization": f"Bearer {token}"},
-                  timeout=15
-              )
-              if ap.status_code == 200:
-                  j = ap.json()
-                  for g in j.get("nowPlaying", []):
-                      if g.get("gameId") == game_id:
-                          last_white_move = g.get("lastMove")
-                          break
-          except Exception as e:
-              print(f"⚠️ Impossible de récupérer le dernier coup blanc: {e}")
-
-          # Convertir coup blanc en SAN
-          white_san = None
-          if last_white_move:
-              try:
-                  last_move_obj = chess.Move.from_uci(last_white_move)
-                  tmp_board = chess.Board(fen)  # position avant le coup noir
-                  white_san = tmp_board.san(last_move_obj)
-              except Exception:
-                  white_san = last_white_move
-
-          # Numéro du coup (selon PGN)
+          # Numéro du coup
           move_number = board.fullmove_number
           black_san = san_move
 
