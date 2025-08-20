@@ -14,6 +14,7 @@ SVG_FILE = DATA_DIR / "thumbnail_black.svg"
 PNG_FILE = DATA_DIR / "thumbnail_black.png"
 BOT_ELO_FILE = DATA_DIR / "bot_elo.txt"
 HISTORY_FILE = DATA_DIR / "historique.txt"
+GAME_ID_FILE = DATA_DIR / "game_id.txt"
 
 # --- Lecture Elo du bot ---
 if not BOT_ELO_FILE.exists():
@@ -49,25 +50,58 @@ if not token:
 
 resp = requests.get("https://lichess.org/api/account/playing",
                     headers={"Authorization": f"Bearer {token}"}, timeout=10)
-if resp.status_code != 200:
+
+titre_principal = "♟️ Partie interactive en cours !"
+titre_secondaire = ""
+fen = None
+last_move_uci = ""
+game_id = None
+
+if resp.status_code == 200:
+    data = resp.json()
+    games = data.get("nowPlaying", [])
+    if games:
+        # Partie active trouvée
+        g = games[0]
+        game_id = g["gameId"]
+        fen = g["fen"]
+        last_move_uci = g.get("lastMove", "")
+        print(f"♟️ Partie détectée: {game_id}")
+        print("FEN actuelle:", fen)
+        print("Dernier coup (UCI brut):", last_move_uci)
+    else:
+        print("⚠️ Aucune partie en cours trouvée → tentative via game/export")
+else:
     print(f"❌ Erreur Lichess account/playing: {resp.status_code} {resp.text[:200]}")
+
+# --- Si aucune partie active : fallback sur game/export ---
+if not fen and GAME_ID_FILE.exists():
+    game_id = GAME_ID_FILE.read_text(encoding="utf-8").strip()
+    url = f"https://lichess.org/game/export/{game_id}?moves=1&fen=1&pgn=1"
+    resp = requests.get(url, headers={"Authorization": f"Bearer {token}"}, timeout=10)
+    if resp.status_code == 200:
+        data = resp.json()
+        fen = data.get("fen")
+        moves = data.get("moves", "").split()
+        last_move_uci = moves[-1] if moves else None
+        result = data.get("status", "")
+        result_map = {
+            "mate": "Échec et mat",
+            "resign": "Abandon",
+            "stalemate": "Pat",
+            "draw": "Match nul",
+            "outoftime": "Temps écoulé",
+            "timeout": "Temps écoulé",
+            "cheat": "Partie annulée",
+        }
+        reason = result_map.get(result.lower(), result)
+        titre_principal = "♟️ Partie terminée"
+        titre_secondaire = f"Résultat : {reason if reason else 'inconnu'}"
+        print("📌 Partie terminée :", titre_secondaire)
+
+if not fen:
+    print("❌ Impossible de récupérer la FEN.")
     exit(1)
-
-data = resp.json()
-games = data.get("nowPlaying", [])
-if not games:
-    print("⚠️ Aucune partie en cours trouvée.")
-    exit(0)
-
-# On prend la 1ère partie active
-g = games[0]
-game_id = g["gameId"]
-fen = g["fen"]
-last_move_uci = g.get("lastMove", "")
-
-print(f"♟️ Partie détectée: {game_id}")
-print("FEN actuelle:", fen)
-print("Dernier coup (UCI brut):", last_move_uci)
 
 # --- Reconstruction échiquier ---
 board = chess.Board(fen)
@@ -89,15 +123,14 @@ moves_list = load_history()
 # --- Formatage avec numéros complets ---
 def format_history_lines(moves):
     lignes = []
-    nb_coups = (len(moves) + 1) // 2  # nombre de paires existantes
+    nb_coups = (len(moves) + 1) // 2
     max_num = max(nb_coups, 1)
 
     for i in range(max_num):
         num = i + 1
         coup_blanc = moves[i * 2] if i * 2 < len(moves) else "—"
-        coup_noir = moves[i * 2 + 1] if i * 2 + 1 < len(moves) else "—"
+        coup_noir = moves[i * 2 + 1] if i * 2 < len(moves) else "—"
 
-        # Vérification basique de format (2–6 caractères alphanumériques ou promotion)
         valid_regex = r"^[a-hKQRBN][a-h1-8x=QRBN\+#-]{1,5}$"
         if not re.match(valid_regex, coup_blanc):
             coup_blanc = "—"
@@ -106,7 +139,6 @@ def format_history_lines(moves):
 
         lignes.append(f'<tspan fill="red">{num}.</tspan> {coup_blanc} {coup_noir}')
 
-    # Regroupe par blocs de 5 numéros par ligne
     lignes_split = []
     for j in range(0, len(lignes), 5):
         lignes_split.append(" ".join(lignes[j:j+5]))
@@ -140,22 +172,30 @@ svg_echiquier = _force_board_colors(svg_echiquier)
 svg_final = f"""<?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <svg width="1280" height="720" xmlns="http://www.w3.org/2000/svg">
   <rect width="100%" height="100%" fill="#f9fafb"/>
-  <text x="75%" y="60" text-anchor="middle" font-size="35" font-family="Ubuntu" fill="#1f2937">
-    ♟️ Partie Interactive !
-  </text>
-  <text x="700" y="105" font-size="22" font-family="Ubuntu" fill="#1f2937">
+  <text x="75%" y="55" text-anchor="middle" font-size="32" font-family="Ubuntu" fill="#1f2937">
+    {titre_principal}
+  </text>"""
+
+if titre_secondaire:
+    svg_final += f"""
+  <text x="75%" y="85" text-anchor="middle" font-size="22" font-family="Ubuntu" fill="#374151">
+    {titre_secondaire}
+  </text>"""
+
+svg_final += f"""
+  <text x="700" y="135" font-size="22" font-family="Ubuntu" fill="#1f2937">
     1. Postez votre coup en commentaire.
   </text>
-  <text x="700" y="135" font-size="22" font-family="Ubuntu" fill="#1f2937">
+  <text x="700" y="165" font-size="22" font-family="Ubuntu" fill="#1f2937">
     2. Le coup majoritaire sera joué automatiquement !
   </text>
   <g transform="translate(40,50)">
     {svg_echiquier}
   </g>
-  <text x="700" y="180" font-size="26" font-family="Ubuntu" fill="#111">
+  <text x="700" y="200" font-size="26" font-family="Ubuntu" fill="#111">
     Dernier coup : {last_move_uci if last_move_uci else "(aucun)"}
   </text>
-  <text x="700" y="230" font-size="28" font-family="Ubuntu" fill="#111">
+  <text x="700" y="240" font-size="28" font-family="Ubuntu" fill="#111">
     ➤ Choisissez le prochain coup !
   </text>
   <text x="700" y="280" font-size="22" font-family="Ubuntu" fill="#555">
