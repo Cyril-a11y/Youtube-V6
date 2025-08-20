@@ -167,7 +167,7 @@ jobs:
           if not fen_api:
               fen_api = fen_after_local
 
-          # Mise à jour move_history.json (comme avant)
+          # Mise à jour move_history.json
           history_file = data_dir / "move_history.json"
           history = []
           if history_file.exists():
@@ -193,6 +193,9 @@ jobs:
 
           # --- Nouveau : enregistrement parallèle dans historique.txt ---
           hist_txt = data_dir / "historique.txt"
+          hist_txt.parent.mkdir(parents=True, exist_ok=True)  # crée data/ si besoin
+          hist_txt.touch(exist_ok=True)  # crée le fichier si inexistant
+
           line = f"[{datetime.now(timezone.utc).isoformat()}] Noir joue {last_move_api} → {fen_api}\n"
           with open(hist_txt, "a", encoding="utf-8") as f:
               f.write(line)
