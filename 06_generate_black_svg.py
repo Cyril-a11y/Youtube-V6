@@ -1,8 +1,7 @@
-# 06_generate_black_svg.py — intégration de historique.txt dans le SVG
+# 06_generate_black_svg.py — Historique complet avec trous remplis par un trait noir
 
 import os
 import re
-import json
 import chess
 import requests
 import chess.svg
@@ -14,7 +13,7 @@ DATA_DIR = Path("data")
 SVG_FILE = DATA_DIR / "thumbnail_black.svg"
 PNG_FILE = DATA_DIR / "thumbnail_black.png"
 BOT_ELO_FILE = DATA_DIR / "bot_elo.txt"
-HISTORY_FILE = DATA_DIR / "historique.txt"   # <-- on prend maintenant historique.txt
+HISTORY_FILE = DATA_DIR / "historique.txt"
 
 # --- Lecture Elo du bot ---
 if not BOT_ELO_FILE.exists():
@@ -79,7 +78,6 @@ def load_history():
         return []
     try:
         text = HISTORY_FILE.read_text(encoding="utf-8").strip()
-        # Découpe tous les coups en ignorant les numéros
         tokens = re.split(r"\s+", text)
         moves = [tok for tok in tokens if not tok.endswith(".")]
         return moves
@@ -88,17 +86,29 @@ def load_history():
 
 moves_list = load_history()
 
+# --- Formatage avec numéros complets ---
 def format_history_lines(moves):
     lignes = []
-    for i in range(0, len(moves), 2):
-        num = (i // 2) + 1
-        bloc = moves[i:i+2]
-        if len(bloc) == 1:
-            lignes.append(f'<tspan fill="red">{num}.</tspan> {bloc[0]}')
-        else:
-            lignes.append(f'<tspan fill="red">{num}.</tspan> {bloc[0]} {bloc[1]}')
+    nb_coups = (len(moves) + 1) // 2  # nombre de paires existantes
+    max_num = max(nb_coups, 1)
+
+    for i in range(max_num):
+        num = i + 1
+        coup_blanc = moves[i * 2] if i * 2 < len(moves) else "—"
+        coup_noir = moves[i * 2 + 1] if i * 2 + 1 < len(moves) else "—"
+
+        # Vérification basique de format (2–6 caractères alphanumériques ou promotion)
+        valid_regex = r"^[a-hKQRBN][a-h1-8x=QRBN\+#-]{1,5}$"
+        if not re.match(valid_regex, coup_blanc):
+            coup_blanc = "—"
+        if not re.match(valid_regex, coup_noir):
+            coup_noir = "—"
+
+        lignes.append(f'<tspan fill="red">{num}.</tspan> {coup_blanc} {coup_noir}')
+
+    # Regroupe par blocs de 5 numéros par ligne
     lignes_split = []
-    for j in range(0, len(lignes), 5):  # retour à la ligne tous les 5 numéros
+    for j in range(0, len(lignes), 5):
         lignes_split.append(" ".join(lignes[j:j+5]))
     return lignes_split
 
