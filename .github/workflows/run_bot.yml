@@ -139,30 +139,47 @@ jobs:
               encoding="utf-8"
           )
 
-          # Lecture via /api/account/playing
-          last_move_api, fen_api = None, None
+          # Lecture du dernier coup blanc via API
+          last_white_move = None
           try:
               ap = requests.get(
                   "https://lichess.org/api/account/playing",
                   headers={"Authorization": f"Bearer {token}"},
                   timeout=15
               )
-              print(f"📥 GET /api/account/playing -> {ap.status_code}")
               if ap.status_code == 200:
                   j = ap.json()
-                  now_playing = j.get("nowPlaying", [])
-                  for g in now_playing:
+                  for g in j.get("nowPlaying", []):
                       if g.get("gameId") == game_id:
-                          last_move_api = g.get("lastMove")
-                          fen_api = g.get("fen")
+                          last_white_move = g.get("lastMove")
                           break
           except Exception as e:
-              print(f"⚠️ Exception lors du GET /api/account/playing: {e}")
+              print(f"⚠️ Impossible de récupérer le dernier coup blanc: {e}")
 
-          if not last_move_api:
-              last_move_api = uci_move
-          if not fen_api:
-              fen_api = fen_after_local
+          # Convertir coup blanc en SAN
+          white_san = None
+          if last_white_move:
+              try:
+                  last_move_obj = chess.Move.from_uci(last_white_move)
+                  tmp_board = chess.Board(fen)  # position avant le coup noir
+                  white_san = tmp_board.san(last_move_obj)
+              except Exception:
+                  white_san = last_white_move
+
+          # Numéro du coup (selon PGN)
+          move_number = board.fullmove_number
+          black_san = san_move
+
+          # Format PGN-like
+          if white_san:
+              line = f"{move_number}. {white_san} {black_san}\n"
+          else:
+              line = f"{move_number}... {black_san}\n"
+
+          with open(data_dir / "historique.txt", "a", encoding="utf-8") as f:
+              f.write(line)
+
+          print(f"✅ historique.txt mis à jour : {line.strip()}")
 
           # Mise à jour move_history.json
           history_file = data_dir / "move_history.json"
@@ -177,8 +194,8 @@ jobs:
 
           entry = {
               "couleur": "noir",
-              "coup": last_move_api,
-              "fen_apres": fen_api,
+              "coup": uci_move,
+              "fen_apres": fen_after_local,
               "horodatage": datetime.now(timezone.utc).isoformat()
           }
           history.append(entry)
@@ -190,12 +207,6 @@ jobs:
           PY
 
           python3 play_move.py
-
-          # --- Mise à jour simple de historique.txt (bash direct) ---
-          LAST_MOVE=$(jq -r '.nowPlaying[] | select(.gameId=="'"$GAME_ID"'") | .lastMove' data/account_playing.json)
-          GAME_FEN=$(jq -r '.nowPlaying[] | select(.gameId=="'"$GAME_ID"'") | .fen' data/account_playing.json)
-          echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] Noir joue $LAST_MOVE → $GAME_FEN" >> data/historique.txt
-          echo "✅ historique.txt mis à jour (bash append)"
 
       # 4) Commit & push (force direct, pas de rebase)
       - name: Commit & Push changes
