@@ -91,6 +91,21 @@ def recuperer_commentaires(video_id, apres=None):
 def _sans_accents(s: str) -> str:
     return "".join(c for c in unicodedata.normalize("NFD", s) if unicodedata.category(c) != "Mn")
 
+# --- Conversion promotion FR → EN ---
+PROMO_MAP = {
+    "d": "Q",  # Dame → Queen
+    "f": "B",  # Fou → Bishop
+    "c": "N",  # Cavalier → Knight
+    "t": "R",  # Tour → Rook
+}
+def normalize_promotion(move: str) -> str:
+    """Corrige la promotion si elle est notée en français (min/maj)"""
+    if "=" in move and len(move) >= 5:
+        base, promo = move[:-1], move[-1].lower()
+        if promo in PROMO_MAP:
+            return base + PROMO_MAP[promo]
+    return move
+
 def nettoyer_et_corriger_san(commentaire: str) -> str:
     raw = commentaire.strip()
     raw = (raw.replace("×", "x").replace("–", "-").replace("—", "-")
@@ -113,14 +128,13 @@ def nettoyer_et_corriger_san(commentaire: str) -> str:
 
     # Cas spéciaux pions
     if re.fullmatch(r"[a-h][1-8]", txt_lower):
-        # ex: f4 → pion en f4
         return txt_lower
     if re.fullmatch(r"[a-h]x[a-h][1-8]", txt_lower):
-        # ex: fxe5 → pion prend en e5
         return txt_lower
 
     # Sinon nettoyage basique
     cleaned = re.sub(r"[^a-h1-8nbrqkx=+#]", "", txt_lower)
+    cleaned = normalize_promotion(cleaned)  # ✅ applique la normalisation FR→EN
     return cleaned
 
 def extraire_coups_valides(board, commentaires):
