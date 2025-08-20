@@ -59,11 +59,14 @@ last_move_uci = ""
 game_id = None
 date_fin_str = ""
 
-if resp.status_code == 200:
-    data = resp.json()
+if resp.status_code == 200 and resp.text.strip():
+    try:
+        data = resp.json()
+    except Exception:
+        print("⚠️ Réponse Lichess non-JSON, brut =", resp.text[:200])
+        data = {}
     games = data.get("nowPlaying", [])
     if games:
-        # Partie active trouvée
         g = games[0]
         game_id = g["gameId"]
         fen = g["fen"]
@@ -74,15 +77,19 @@ if resp.status_code == 200:
     else:
         print("⚠️ Aucune partie en cours trouvée → tentative via game/export")
 else:
-    print(f"❌ Erreur Lichess account/playing: {resp.status_code} {resp.text[:200]}")
+    print(f"❌ Erreur Lichess account/playing: {resp.status_code}, contenu vide ou invalide")
 
 # --- Si aucune partie active : fallback sur game/export ---
 if not fen and GAME_ID_FILE.exists():
     game_id = GAME_ID_FILE.read_text(encoding="utf-8").strip()
     url = f"https://lichess.org/game/export/{game_id}?moves=1&fen=1&pgn=1"
     resp = requests.get(url, headers={"Authorization": f"Bearer {token}"}, timeout=10)
-    if resp.status_code == 200:
-        data = resp.json()
+    if resp.status_code == 200 and resp.text.strip():
+        try:
+            data = resp.json()
+        except Exception:
+            print("⚠️ Réponse non-JSON sur game/export, brut =", resp.text[:200])
+            data = {}
         fen = data.get("fen")
         moves = data.get("moves", "").split()
         last_move_uci = moves[-1] if moves else None
@@ -100,10 +107,8 @@ if not fen and GAME_ID_FILE.exists():
         titre_principal = "♟️ Partie terminée"
         titre_secondaire = f"Résultat : {reason if reason else 'inconnu'}"
         print("📌 Partie terminée :", titre_secondaire)
-
-        # Ajout de la date/heure de fin
         if "lastMoveAt" in data:
-            ts = int(data["lastMoveAt"]) / 1000  # ms → s
+            ts = int(data["lastMoveAt"]) / 1000
             dt = datetime.utcfromtimestamp(ts)
             date_fin_str = dt.strftime("Terminé le %d/%m à %H:%M")
             print("🕒 Date fin :", date_fin_str)
@@ -134,20 +139,16 @@ def format_history_lines(moves):
     lignes = []
     nb_coups = (len(moves) + 1) // 2
     max_num = max(nb_coups, 1)
-
     for i in range(max_num):
         num = i + 1
-        coup_blanc = moves[i * 2] if i * 2 < len(moves) else "—"
-        coup_noir = moves[i * 2 + 1] if i * 2 < len(moves) else "—"
-
-        valid_regex = r"^[a-hKQRBN][a-h1-8x=QRBN\+#-]{1,5}$"
+        coup_blanc = moves[i*2] if i*2 < len(moves) else "—"
+        coup_noir = moves[i*2+1] if i*2+1 < len(moves) else "—"
+        valid_regex = r"^[a-hKQRBN][a-h1-8x=QRBN\+#=]{1,5}$"
         if not re.match(valid_regex, coup_blanc):
             coup_blanc = "—"
         if not re.match(valid_regex, coup_noir):
             coup_noir = "—"
-
         lignes.append(f'<tspan fill="red">{num}.</tspan> {coup_blanc} {coup_noir}')
-
     lignes_split = []
     for j in range(0, len(lignes), 5):
         lignes_split.append(" ".join(lignes[j:j+5]))
