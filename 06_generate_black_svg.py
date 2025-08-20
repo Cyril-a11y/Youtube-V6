@@ -1,4 +1,4 @@
-# 06_generate_black_svg.py — affichage dernier coup en UCI brut
+# 06_generate_black_svg.py — intégration de historique.txt dans le SVG
 
 import os
 import re
@@ -14,9 +14,9 @@ DATA_DIR = Path("data")
 SVG_FILE = DATA_DIR / "thumbnail_black.svg"
 PNG_FILE = DATA_DIR / "thumbnail_black.png"
 BOT_ELO_FILE = DATA_DIR / "bot_elo.txt"
-HISTORY_FILE = DATA_DIR / "dernier_coup.json"
+HISTORY_FILE = DATA_DIR / "historique.txt"   # <-- on prend maintenant historique.txt
 
-# --- Lecture Elo du bot (obligatoire, sans fallback) ---
+# --- Lecture Elo du bot ---
 if not BOT_ELO_FILE.exists():
     raise SystemExit("❌ bot_elo.txt introuvable — le workflow doit l'écrire avant.")
 
@@ -41,7 +41,7 @@ def _force_board_colors(svg_str, light="#ebf0f7", dark="#6095df"):
                      svg_str, count=1)
     return svg_str
 
-# --- API Lichess (account/playing live) ---
+# --- API Lichess ---
 print("📥 Récupération de l'état de la partie en cours (live)…")
 token = os.getenv("LICHESS_BOT_TOKEN")
 if not token:
@@ -70,20 +70,19 @@ print(f"♟️ Partie détectée: {game_id}")
 print("FEN actuelle:", fen)
 print("Dernier coup (UCI brut):", last_move_uci)
 
-# --- Reconstruction échiquier depuis FEN ---
+# --- Reconstruction échiquier ---
 board = chess.Board(fen)
 
-# --- Historique ---
+# --- Historique (depuis historique.txt) ---
 def load_history():
     if not HISTORY_FILE.exists():
         return []
     try:
-        data = json.loads(HISTORY_FILE.read_text(encoding="utf-8"))
-        if isinstance(data, dict) and "coups" in data:
-            return data["coups"]
-        elif isinstance(data, list):
-            return data
-        return []
+        text = HISTORY_FILE.read_text(encoding="utf-8").strip()
+        # Découpe tous les coups en ignorant les numéros
+        tokens = re.split(r"\s+", text)
+        moves = [tok for tok in tokens if not tok.endswith(".")]
+        return moves
     except Exception:
         return []
 
@@ -99,7 +98,7 @@ def format_history_lines(moves):
         else:
             lignes.append(f'<tspan fill="red">{num}.</tspan> {bloc[0]} {bloc[1]}')
     lignes_split = []
-    for j in range(0, len(lignes), 5):
+    for j in range(0, len(lignes), 5):  # retour à la ligne tous les 5 numéros
         lignes_split.append(" ".join(lignes[j:j+5]))
     return lignes_split
 
