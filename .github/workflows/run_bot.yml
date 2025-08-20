@@ -151,13 +151,10 @@ jobs:
               if ap.status_code == 200:
                   j = ap.json()
                   now_playing = j.get("nowPlaying", [])
-                  print("DEBUG nowPlaying:", json.dumps(now_playing, indent=2, ensure_ascii=False))
                   for g in now_playing:
                       if g.get("gameId") == game_id:
-                          print(f"✅ Partie trouvée (gameId={game_id})")
                           last_move_api = g.get("lastMove")
                           fen_api = g.get("fen")
-                          print(f"   ↳ lastMove = {last_move_api}, fen = {fen_api[:40]}...")
                           break
           except Exception as e:
               print(f"⚠️ Exception lors du GET /api/account/playing: {e}")
@@ -190,26 +187,21 @@ jobs:
               encoding="utf-8"
           )
           print("✅ move_history.json mis à jour (coup noir consigné)")
-
-          # --- Nouveau : enregistrement parallèle dans historique.txt ---
-          hist_txt = data_dir / "historique.txt"
-          hist_txt.parent.mkdir(parents=True, exist_ok=True)  # crée data/ si besoin
-          hist_txt.touch(exist_ok=True)  # crée le fichier si inexistant
-
-          line = f"[{datetime.now(timezone.utc).isoformat()}] Noir joue {last_move_api} → {fen_api}\n"
-          with open(hist_txt, "a", encoding="utf-8") as f:
-              f.write(line)
-          print("✅ historique.txt mis à jour (coup noir ajouté)")
           PY
 
           python3 play_move.py
 
-      # 4) Commit & push avec rebase
-      - name: Commit updated files
+          # --- Mise à jour simple de historique.txt (bash direct) ---
+          LAST_MOVE=$(jq -r '.nowPlaying[] | select(.gameId=="'"$GAME_ID"'") | .lastMove' data/account_playing.json)
+          GAME_FEN=$(jq -r '.nowPlaying[] | select(.gameId=="'"$GAME_ID"'") | .fen' data/account_playing.json)
+          echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] Noir joue $LAST_MOVE → $GAME_FEN" >> data/historique.txt
+          echo "✅ historique.txt mis à jour (bash append)"
+
+      # 4) Commit & push (force direct, pas de rebase)
+      - name: Commit & Push changes
         run: |
           git config user.name "github-actions"
           git config user.email "actions@github.com"
-          git pull --rebase origin main || true
           git add data/position.fen data/dernier_coup.json data/move_history.json data/historique.txt data/bot_elo.txt || true
           git diff --cached --quiet || git commit -m "MAJ après coup noir"
-          git push --force-with-lease origin main || true
+          git push origin main --force
