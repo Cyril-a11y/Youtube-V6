@@ -1,4 +1,4 @@
-# 06_generate_black_svg.py — Historique complet avec trous remplis par un trait noir
+# 06_generate_black_svg.py — Historique complet avec trous remplis par un trait noir + date fin
 
 import os
 import re
@@ -6,7 +6,8 @@ import chess
 import requests
 import chess.svg
 from pathlib import Path
-import cairosvg   # ✅ rendu SVG → PNG plus fiable
+import cairosvg
+from datetime import datetime
 
 # --- Fichiers ---
 DATA_DIR = Path("data")
@@ -56,6 +57,7 @@ titre_secondaire = ""
 fen = None
 last_move_uci = ""
 game_id = None
+date_fin_str = ""
 
 if resp.status_code == 200:
     data = resp.json()
@@ -99,6 +101,13 @@ if not fen and GAME_ID_FILE.exists():
         titre_secondaire = f"Résultat : {reason if reason else 'inconnu'}"
         print("📌 Partie terminée :", titre_secondaire)
 
+        # Ajout de la date/heure de fin
+        if "lastMoveAt" in data:
+            ts = int(data["lastMoveAt"]) / 1000  # ms → s
+            dt = datetime.utcfromtimestamp(ts)
+            date_fin_str = dt.strftime("Terminé le %d/%m à %H:%M")
+            print("🕒 Date fin :", date_fin_str)
+
 if not fen:
     print("❌ Impossible de récupérer la FEN.")
     exit(1)
@@ -106,7 +115,7 @@ if not fen:
 # --- Reconstruction échiquier ---
 board = chess.Board(fen)
 
-# --- Historique (depuis historique.txt) ---
+# --- Historique ---
 def load_history():
     if not HISTORY_FILE.exists():
         return []
@@ -208,7 +217,15 @@ svg_final += f"""
   {historique_svg}
   <text x="750" y="700" font-size="25" font-family="Ubuntu" fill="#1f2937" font-weight="bold">
     Chaîne YOUTUBE : PriseEnPassant
-  </text>
+  </text>"""
+
+if date_fin_str:
+    svg_final += f"""
+  <text x="400" y="700" font-size="20" font-family="Ubuntu" fill="#374151">
+    {date_fin_str}
+  </text>"""
+
+svg_final += f"""
   <text x="50" y="40" font-size="22" font-family="Ubuntu" fill="#1f2937">
     ♟️ {NOM_NOIRS}
   </text>
