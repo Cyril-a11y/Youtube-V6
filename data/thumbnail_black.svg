@@ -7,6 +7,12 @@
   <text x="75%" y="85" text-anchor="middle" font-size="22" font-family="Ubuntu" fill="#374151">
     Résultat : 1-0
   </text>
+  <text x="700" y="135" font-size="22" font-family="Ubuntu" fill="#1f2937">
+    1. Postez votre coup en commentaire.
+  </text>
+  <text x="700" y="165" font-size="22" font-family="Ubuntu" fill="#1f2937">
+    2. Le coup majoritaire sera joué automatiquement !
+  </text>
   <g transform="translate(40,50)">
     <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 390 390" width="620" height="620"><style>.square.light{fill:#ebf0f7 !important}.square.dark{fill:#6095df !important}</style><desc><pre>r n b q k b n r
 p p p p p p p p
@@ -19,6 +25,12 @@ R N B Q K B N R</pre></desc><defs><g id="white-pawn" class="white pawn"><path d=
   </g>
   <text x="700" y="200" font-size="26" font-family="Ubuntu" fill="#111">
     Dernier coup : (aucun)
+  </text>
+  <text x="700" y="240" font-size="28" font-family="Ubuntu" fill="#111">
+    ➤ Choisissez le prochain coup !
+  </text>
+  <text x="700" y="280" font-size="22" font-family="Ubuntu" fill="#555">
+    Tour : 10
   </text>
   <rect x="680" y="295" width="580" height="340" fill="#fff" stroke="#d1d5db" stroke-width="1" rx="8" ry="8"/>
   <text x="700" y="330" font-size="24" font-family="Ubuntu" fill="#1f2937" font-weight="bold">
