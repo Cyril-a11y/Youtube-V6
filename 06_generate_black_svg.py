@@ -94,55 +94,31 @@ if not fen and GAME_ID_FILE.exists():
             data = resp.json()
             moves = data.get("moves", "").split()
 
-            # Rejouer les coups pour reconstruire la position finale
+            # Rejouer les coups SAN pour reconstruire la position finale
             board = chess.Board()
             for mv in moves:
                 try:
-                    board.push_uci(mv)
+                    board.push_san(mv)
                 except Exception as e:
-                    print("⚠️ Coup invalide ignoré:", mv, e)
+                    print("⚠️ Coup SAN invalide ignoré:", mv, e)
             fen = board.fen()
 
-            # Dernier coup
+            # Dernier coup en SAN (brut depuis moves)
             last_move_uci = moves[-1] if moves else None
 
-            # Résultat
             if data.get("winner") == "white":
                 titre_secondaire = f"Résultat : 1-0 ({NOM_BLANCS})"
             elif data.get("winner") == "black":
                 titre_secondaire = f"Résultat : 0-1 ({NOM_NOIRS})"
-            elif data.get("status") == "draw":
-                titre_secondaire = "Résultat : ½-½ (Match nul)"
             else:
-                titre_secondaire = "Résultat : inconnu"
+                titre_secondaire = "Résultat : ½-½ (Match nul)"
 
             titre_principal = "♟️ Partie terminée"
             partie_terminee = True
             print("📌 Partie terminée :", titre_secondaire)
 
-        except Exception:
-            # Fallback PGN brut
-            text = resp.text
-            print("⚠️ game/export renvoie du PGN brut")
-            # Essayer d'extraire FEN
-            fen_match = re.search(r'\[FEN "([^"]+)"\]', text)
-            if fen_match:
-                fen = fen_match.group(1)
-                print("✅ FEN finale extraite du PGN :", fen)
-            # Résultat
-            result_match = re.search(r'\[Result "([^"]+)"\]', text)
-            result = result_match.group(1) if result_match else "inconnu"
-            if result == "1-0":
-                titre_secondaire = f"Résultat : 1-0 ({NOM_BLANCS})"
-            elif result == "0-1":
-                titre_secondaire = f"Résultat : 0-1 ({NOM_NOIRS})"
-            elif result == "1/2-1/2":
-                titre_secondaire = "Résultat : ½-½ (Match nul)"
-            else:
-                titre_secondaire = f"Résultat : {result}"
-            titre_principal = "♟️ Partie terminée"
-            partie_terminee = True
-            print("📌 Partie terminée :", titre_secondaire)
+        except Exception as e:
+            print("❌ Impossible de parser correctement game/export", e)
 
 # --- Vérification FEN ---
 if not fen:
@@ -204,7 +180,7 @@ svg_echiquier = chess.svg.board(
     board=board,
     orientation=chess.WHITE,
     size=620,
-    lastmove=chess.Move.from_uci(last_move_uci) if last_move_uci else None
+    lastmove=None  # on ne tente pas UCI ici car SAN non compatible
 )
 svg_echiquier = _force_board_colors(svg_echiquier)
 
