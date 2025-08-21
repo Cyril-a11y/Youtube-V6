@@ -92,16 +92,29 @@ if not fen and GAME_ID_FILE.exists():
     if resp.status_code == 200 and resp.text.strip():
         try:
             data = resp.json()
-            fen = data.get("fen")
             moves = data.get("moves", "").split()
+
+            # Rejouer les coups pour reconstruire la position finale
+            board = chess.Board()
+            for mv in moves:
+                try:
+                    board.push_uci(mv)
+                except Exception as e:
+                    print("⚠️ Coup invalide ignoré:", mv, e)
+            fen = board.fen()
+
+            # Dernier coup
             last_move_uci = moves[-1] if moves else None
 
+            # Résultat
             if data.get("winner") == "white":
                 titre_secondaire = f"Résultat : 1-0 ({NOM_BLANCS})"
             elif data.get("winner") == "black":
                 titre_secondaire = f"Résultat : 0-1 ({NOM_NOIRS})"
-            else:
+            elif data.get("status") == "draw":
                 titre_secondaire = "Résultat : ½-½ (Match nul)"
+            else:
+                titre_secondaire = "Résultat : inconnu"
 
             titre_principal = "♟️ Partie terminée"
             partie_terminee = True
