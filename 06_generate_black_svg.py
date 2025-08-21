@@ -1,4 +1,4 @@
-# 06_generate_black_svg.py — Historique complet avec trous remplis par un trait noir + date fin (corrigé)
+# 06_generate_black_svg.py — Historique complet avec trous remplis par un trait noir + date fin (corrigé et robuste)
 
 import os
 import re
@@ -187,11 +187,23 @@ if titre_secondaire:
   </text>"""
 
 svg_final += f"""
+  <text x="700" y="135" font-size="22" font-family="Ubuntu" fill="#1f2937">
+    1. Postez votre coup en commentaire.
+  </text>
+  <text x="700" y="165" font-size="22" font-family="Ubuntu" fill="#1f2937">
+    2. Le coup majoritaire sera joué automatiquement !
+  </text>
   <g transform="translate(40,50)">
     {svg_echiquier}
   </g>
   <text x="700" y="200" font-size="26" font-family="Ubuntu" fill="#111">
     Dernier coup : {last_move_uci if last_move_uci else "(aucun)"}
+  </text>
+  <text x="700" y="240" font-size="28" font-family="Ubuntu" fill="#111">
+    ➤ Choisissez le prochain coup !
+  </text>
+  <text x="700" y="280" font-size="22" font-family="Ubuntu" fill="#555">
+    Tour : {tour}
   </text>
   <rect x="680" y="295" width="580" height="340" fill="#fff" stroke="#d1d5db" stroke-width="1" rx="8" ry="8"/>
   <text x="700" y="330" font-size="24" font-family="Ubuntu" fill="#1f2937" font-weight="bold">
