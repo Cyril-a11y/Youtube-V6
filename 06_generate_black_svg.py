@@ -83,36 +83,36 @@ else:
 # --- Si aucune partie active : fallback sur game/export ---
 if not fen and GAME_ID_FILE.exists():
     game_id = GAME_ID_FILE.read_text(encoding="utf-8").strip()
-    url = f"https://lichess.org/game/export/{game_id}?moves=1&fen=1&pgn=1"
+    url = f"https://lichess.org/game/export/{game_id}?moves=1&fen=1"
     resp = requests.get(url, headers={"Authorization": f"Bearer {token}"}, timeout=10)
     if resp.status_code == 200 and resp.text.strip():
         try:
             data = resp.json()
-            # partie encore exportable en JSON
             fen = data.get("fen")
             moves = data.get("moves", "").split()
             last_move_uci = moves[-1] if moves else None
             result = data.get("status", "")
-        except Exception:
-            # Partie finie → PGN brut
-            text = resp.text
-            print("⚠️ Réponse non-JSON sur game/export, brut =", text[:200])
-            result_match = re.search(r'\[Result "([^"]+)"\]', text)
-            result = result_match.group(1) if result_match else "inconnu"
+
+            # déterminer le vainqueur simple
+            if data.get("winner") == "white":
+                titre_secondaire = f"Résultat : 1-0 ({NOM_BLANCS})"
+            elif data.get("winner") == "black":
+                titre_secondaire = f"Résultat : 0-1 ({NOM_NOIRS})"
+            else:
+                titre_secondaire = "Résultat : ½-½ (Match nul)"
+
             titre_principal = "♟️ Partie terminée"
-            titre_secondaire = f"Résultat : {result}"
             partie_terminee = True
             print("📌 Partie terminée :", titre_secondaire)
 
-# --- Si partie terminée sans FEN : utiliser plateau vide ---
-if not fen and partie_terminee:
-    board = chess.Board()  # échiquier initial, faute de mieux
-    fen = board.fen()
-else:
-    if not fen:
-        print("❌ Impossible de récupérer la FEN.")
-        exit(1)
-    board = chess.Board(fen)
+        except Exception:
+            print("⚠️ Impossible de parser correctement game/export")
+
+# --- Vérification FEN ---
+if not fen:
+    print("❌ Impossible de récupérer la FEN.")
+    exit(1)
+board = chess.Board(fen)
 
 # --- Historique ---
 def load_history():
