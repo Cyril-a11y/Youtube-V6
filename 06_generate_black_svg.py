@@ -1,4 +1,4 @@
-# 06_generate_black_svg.py — Historique complet avec trous remplis par un trait noir + date fin
+# 06_generate_black_svg.py — Historique complet avec trous remplis par un trait noir + date fin (corrigé)
 
 import os
 import re
@@ -58,6 +58,7 @@ fen = None
 last_move_uci = ""
 game_id = None
 date_fin_str = ""
+partie_terminee = False
 
 if resp.status_code == 200 and resp.text.strip():
     try:
@@ -87,38 +88,31 @@ if not fen and GAME_ID_FILE.exists():
     if resp.status_code == 200 and resp.text.strip():
         try:
             data = resp.json()
+            # partie encore exportable en JSON
+            fen = data.get("fen")
+            moves = data.get("moves", "").split()
+            last_move_uci = moves[-1] if moves else None
+            result = data.get("status", "")
         except Exception:
-            print("⚠️ Réponse non-JSON sur game/export, brut =", resp.text[:200])
-            data = {}
-        fen = data.get("fen")
-        moves = data.get("moves", "").split()
-        last_move_uci = moves[-1] if moves else None
-        result = data.get("status", "")
-        result_map = {
-            "mate": "Échec et mat",
-            "resign": "Abandon",
-            "stalemate": "Pat",
-            "draw": "Match nul",
-            "outoftime": "Temps écoulé",
-            "timeout": "Temps écoulé",
-            "cheat": "Partie annulée",
-        }
-        reason = result_map.get(result.lower(), result)
-        titre_principal = "♟️ Partie terminée"
-        titre_secondaire = f"Résultat : {reason if reason else 'inconnu'}"
-        print("📌 Partie terminée :", titre_secondaire)
-        if "lastMoveAt" in data:
-            ts = int(data["lastMoveAt"]) / 1000
-            dt = datetime.utcfromtimestamp(ts)
-            date_fin_str = dt.strftime("Terminé le %d/%m à %H:%M")
-            print("🕒 Date fin :", date_fin_str)
+            # Partie finie → PGN brut
+            text = resp.text
+            print("⚠️ Réponse non-JSON sur game/export, brut =", text[:200])
+            result_match = re.search(r'\[Result "([^"]+)"\]', text)
+            result = result_match.group(1) if result_match else "inconnu"
+            titre_principal = "♟️ Partie terminée"
+            titre_secondaire = f"Résultat : {result}"
+            partie_terminee = True
+            print("📌 Partie terminée :", titre_secondaire)
 
-if not fen:
-    print("❌ Impossible de récupérer la FEN.")
-    exit(1)
-
-# --- Reconstruction échiquier ---
-board = chess.Board(fen)
+# --- Si partie terminée sans FEN : utiliser plateau vide ---
+if not fen and partie_terminee:
+    board = chess.Board()  # échiquier initial, faute de mieux
+    fen = board.fen()
+else:
+    if not fen:
+        print("❌ Impossible de récupérer la FEN.")
+        exit(1)
+    board = chess.Board(fen)
 
 # --- Historique ---
 def load_history():
@@ -193,23 +187,11 @@ if titre_secondaire:
   </text>"""
 
 svg_final += f"""
-  <text x="700" y="135" font-size="22" font-family="Ubuntu" fill="#1f2937">
-    1. Postez votre coup en commentaire.
-  </text>
-  <text x="700" y="165" font-size="22" font-family="Ubuntu" fill="#1f2937">
-    2. Le coup majoritaire sera joué automatiquement !
-  </text>
   <g transform="translate(40,50)">
     {svg_echiquier}
   </g>
   <text x="700" y="200" font-size="26" font-family="Ubuntu" fill="#111">
     Dernier coup : {last_move_uci if last_move_uci else "(aucun)"}
-  </text>
-  <text x="700" y="240" font-size="28" font-family="Ubuntu" fill="#111">
-    ➤ Choisissez le prochain coup !
-  </text>
-  <text x="700" y="280" font-size="22" font-family="Ubuntu" fill="#555">
-    Tour : {tour}
   </text>
   <rect x="680" y="295" width="580" height="340" fill="#fff" stroke="#d1d5db" stroke-width="1" rx="8" ry="8"/>
   <text x="700" y="330" font-size="24" font-family="Ubuntu" fill="#1f2937" font-weight="bold">
