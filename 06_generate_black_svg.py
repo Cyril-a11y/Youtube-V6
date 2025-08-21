@@ -84,16 +84,18 @@ else:
 if not fen and GAME_ID_FILE.exists():
     game_id = GAME_ID_FILE.read_text(encoding="utf-8").strip()
     url = f"https://lichess.org/game/export/{game_id}?moves=1&fen=1"
-    resp = requests.get(url, headers={"Authorization": f"Bearer {token}"}, timeout=10)
+    resp = requests.get(url, headers={
+        "Authorization": f"Bearer {token}",
+        "Accept": "application/json"
+    }, timeout=10)
+
     if resp.status_code == 200 and resp.text.strip():
         try:
             data = resp.json()
             fen = data.get("fen")
             moves = data.get("moves", "").split()
             last_move_uci = moves[-1] if moves else None
-            result = data.get("status", "")
 
-            # déterminer le vainqueur simple
             if data.get("winner") == "white":
                 titre_secondaire = f"Résultat : 1-0 ({NOM_BLANCS})"
             elif data.get("winner") == "black":
@@ -106,7 +108,28 @@ if not fen and GAME_ID_FILE.exists():
             print("📌 Partie terminée :", titre_secondaire)
 
         except Exception:
-            print("⚠️ Impossible de parser correctement game/export")
+            # Fallback PGN brut
+            text = resp.text
+            print("⚠️ game/export renvoie du PGN brut")
+            # Essayer d'extraire FEN
+            fen_match = re.search(r'\[FEN "([^"]+)"\]', text)
+            if fen_match:
+                fen = fen_match.group(1)
+                print("✅ FEN finale extraite du PGN :", fen)
+            # Résultat
+            result_match = re.search(r'\[Result "([^"]+)"\]', text)
+            result = result_match.group(1) if result_match else "inconnu"
+            if result == "1-0":
+                titre_secondaire = f"Résultat : 1-0 ({NOM_BLANCS})"
+            elif result == "0-1":
+                titre_secondaire = f"Résultat : 0-1 ({NOM_NOIRS})"
+            elif result == "1/2-1/2":
+                titre_secondaire = "Résultat : ½-½ (Match nul)"
+            else:
+                titre_secondaire = f"Résultat : {result}"
+            titre_principal = "♟️ Partie terminée"
+            partie_terminee = True
+            print("📌 Partie terminée :", titre_secondaire)
 
 # --- Vérification FEN ---
 if not fen:
