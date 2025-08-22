@@ -1,4 +1,4 @@
-# 06_generate_black_svg.py — Historique complet avec trous remplis + dernier coup en rouge (texte + échiquier)
+# 06_generate_black_svg.py — Historique complet + esthétique verrouillée + dernier coup en rouge (texte + échiquier)
 
 import os
 import re
@@ -174,21 +174,39 @@ svg_echiquier = chess.svg.board(
 )
 svg_echiquier = _force_board_colors(svg_echiquier)
 
-# --- Construction SVG final ---
+# --- Construction SVG final (esthétique verrouillée) ---
 svg_final = f"""<?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <svg width="1280" height="720" xmlns="http://www.w3.org/2000/svg">
   <rect width="100%" height="100%" fill="#f9fafb"/>
+  <text x="75%" y="55" text-anchor="middle" font-size="32" font-family="Ubuntu" fill="#1f2937">
+    {titre_principal}
+  </text>
   <g transform="translate(40,50)">
     {svg_echiquier}
   </g>
   <text x="700" y="200" font-size="26" font-family="Ubuntu" fill="#111">
     Dernier coup : {last_move_uci if last_move_uci else "(aucun)"}
   </text>
+  <text x="700" y="240" font-size="28" font-family="Ubuntu" fill="#111">
+    ➤ Choisissez le prochain coup !
+  </text>
+  <text x="700" y="280" font-size="22" font-family="Ubuntu" fill="#555">
+    Tour : {tour}
+  </text>
   <rect x="680" y="295" width="580" height="340" fill="#fff" stroke="#d1d5db" stroke-width="1" rx="8" ry="8"/>
   <text x="700" y="330" font-size="24" font-family="Ubuntu" fill="#1f2937" font-weight="bold">
     ☰ Historique des coups :
   </text>
   {historique_svg}
+  <text x="750" y="700" font-size="25" font-family="Ubuntu" fill="#1f2937" font-weight="bold">
+    Chaîne YOUTUBE : PriseEnPassant
+  </text>
+  <text x="50" y="40" font-size="22" font-family="Ubuntu" fill="#1f2937">
+    ♟️ {NOM_NOIRS}
+  </text>
+  <text x="50" y="700" font-size="22" font-family="Ubuntu" fill="#1f2937">
+    ♟️ {NOM_BLANCS}
+  </text>
 </svg>
 """
 
