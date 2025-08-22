@@ -181,10 +181,10 @@ svg_final = f"""<?xml version="1.0" encoding="UTF-8" standalone="no"?>
   <text x="75%" y="55" text-anchor="middle" font-size="32" font-family="Ubuntu" fill="#1f2937">
     {titre_principal}
   </text>
-  <text x="700" y="135" font-size="22" font-family="Ubuntu" fill="#1f2937">
+  <text x="700" y="115" font-size="22" font-family="Ubuntu" fill="#1f2937">
     1. Postez votre coup en commentaire.
   </text>
-  <text x="700" y="165" font-size="22" font-family="Ubuntu" fill="#1f2937">
+  <text x="700" y="145" font-size="22" font-family="Ubuntu" fill="#1f2937">
     2. Le coup majoritaire sera joué automatiquement !
   </text>
   <g transform="translate(40,50)">
