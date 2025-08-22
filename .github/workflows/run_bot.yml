@@ -212,6 +212,6 @@ jobs:
         run: |
           git config user.name "github-actions"
           git config user.email "actions@github.com"
-          git add data/position.fen data/dernier_coup.json data/move_history.json data/historique.txt data/bot_elo.txt || true
+          git add data/position.fen data/dernier_coup.json data/move_history.json data/historique.txt || true
           git diff --cached --quiet || git commit -m "MAJ après coup noir"
           git push origin main --force
