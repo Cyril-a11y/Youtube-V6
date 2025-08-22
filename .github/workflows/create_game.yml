@@ -1,4 +1,4 @@
-name: Create Lichess game
+name: Create Lichess game 
 
 on:
   workflow_dispatch:
@@ -52,15 +52,21 @@ jobs:
           import json
           from datetime import datetime, timezone
           import chess
+          from pathlib import Path
+
+          DATA_DIR = Path("data")
+          DATA_DIR.mkdir(exist_ok=True)
 
           starting_fen = chess.STARTING_FEN
 
           # coup_blanc.txt vide
-          open("data/coup_blanc.txt", "w", encoding="utf-8").close()
+          (DATA_DIR / "coup_blanc.txt").write_text("", encoding="utf-8")
+
+          # historique.txt vide
+          (DATA_DIR / "historique.txt").write_text("", encoding="utf-8")
 
           # position.fen = position initiale
-          with open("data/position.fen", "w", encoding="utf-8") as f:
-              f.write(starting_fen)
+          (DATA_DIR / "position.fen").write_text(starting_fen, encoding="utf-8")
 
           # dernier_coup.json avec date + position initiale
           payload = {
@@ -68,12 +74,16 @@ jobs:
               "fen": starting_fen,
               "horodatage": datetime.now(timezone.utc).isoformat()
           }
-          with open("data/dernier_coup.json", "w", encoding="utf-8") as f:
-              json.dump(payload, f, ensure_ascii=False, indent=2)
+          (DATA_DIR / "dernier_coup.json").write_text(
+              json.dumps(payload, ensure_ascii=False, indent=2),
+              encoding="utf-8"
+          )
 
           # move_history.json vide
-          with open("data/move_history.json", "w", encoding="utf-8") as f:
-              json.dump([], f, ensure_ascii=False, indent=2)
+          (DATA_DIR / "move_history.json").write_text(
+              json.dumps([], ensure_ascii=False, indent=2),
+              encoding="utf-8"
+          )
           PY
 
       - name: Debug data directory
@@ -83,6 +93,7 @@ jobs:
           echo "fen:"; test -f data/position.fen && head -n1 data/position.fen || echo "missing"
           echo "last:"; test -f data/dernier_coup.json && cat data/dernier_coup.json || echo "missing"
           echo "history:"; test -f data/move_history.json && cat data/move_history.json || echo "missing"
+          echo "historique:"; test -f data/historique.txt && head -n5 data/historique.txt || echo "missing"
 
       - name: Commit & push game data
         if: success()
@@ -91,6 +102,6 @@ jobs:
           git config user.email "${{ github.actor }}@users.noreply.github.com"
           git fetch origin "$BRANCH"
           git pull --rebase origin "$BRANCH" || true
-          git add -f data/game_id.txt data/position.fen data/dernier_coup.json data/coup_blanc.txt data/move_history.json || true
+          git add -f data/game_id.txt data/position.fen data/dernier_coup.json data/coup_blanc.txt data/move_history.json data/historique.txt || true
           git commit -m "Init game data with starting FEN" || echo "No changes"
           git push --force-with-lease origin HEAD:"$BRANCH"
