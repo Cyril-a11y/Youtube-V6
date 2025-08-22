@@ -73,7 +73,7 @@ jobs:
         run: python 03_process_comments.py
         continue-on-error: true
 
-      # 9) Commit coup_blanc.txt (force, sans l'écraser)
+      # 9) Commit coup_blanc.txt (force, avec timestamp pour éviter "no changes")
       - name: Commit coup_blanc.txt
         run: |
           git fetch origin main
@@ -83,8 +83,10 @@ jobs:
           git config user.name "github-actions"
           git config user.email "actions@github.com"
 
-          COUP=$(cat data/coup_blanc.txt || echo "")
+          COUP=$(head -n 1 data/coup_blanc.txt || echo "")
           echo "$COUP" > data/coup_blanc.txt
+          # ✅ Ajout d'un timestamp invisible pour forcer une diff
+          echo "# updated at $(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> data/coup_blanc.txt
 
           git add -f data/coup_blanc.txt
           git commit -m "Update coup_blanc.txt [skip ci]" || echo "No changes"
