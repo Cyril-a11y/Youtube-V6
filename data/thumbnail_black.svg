@@ -27,7 +27,7 @@ R N B Q K B N R</pre></desc><defs><g id="white-pawn" class="white pawn"><path d=
     ➤ Choisissez le prochain coup !
   </text>
   <text x="700" y="280" font-size="22" font-family="Ubuntu" fill="#555">
-    Tour : 10
+    Tour : 1
   </text>
   <rect x="680" y="295" width="580" height="340" fill="#fff" stroke="#d1d5db" stroke-width="1" rx="8" ry="8"/>
   <text x="700" y="330" font-size="24" font-family="Ubuntu" fill="#1f2937" font-weight="bold">
@@ -35,16 +35,13 @@ R N B Q K B N R</pre></desc><defs><g id="white-pawn" class="white pawn"><path d=
   </text>
   
     <text x="700" y="370" font-size="15" font-family="Ubuntu" fill="#333">
-        <tspan fill="red">1.</tspan> — — <tspan fill="red">2.</tspan> — d1e1 <tspan fill="red">3.</tspan> — — <tspan fill="red">4.</tspan> — — <tspan fill="red">5.</tspan> — —
-    </text>
-    <text x="700" y="404" font-size="15" font-family="Ubuntu" fill="#333">
-        <tspan fill="red">6.</tspan> — Kd7 <tspan fill="red">7.</tspan> Kd7 e7f8 <tspan fill="red">8.</tspan> Kd8 e1g1 <tspan fill="red">9.</tspan> Kd7 h8f6 <tspan fill="red">10.</tspan> Ke8 —
+        <tspan fill="red">1.</tspan> — —
     </text>
   <text x="750" y="700" font-size="25" font-family="Ubuntu" fill="#1f2937" font-weight="bold">
     Chaîne YOUTUBE : PriseEnPassant
   </text>
   <text x="50" y="40" font-size="22" font-family="Ubuntu" fill="#1f2937">
-    ♟️ Stockfish 960 Elo
+    ♟️ Stockfish 1320 Elo
   </text>
   <text x="50" y="700" font-size="22" font-family="Ubuntu" fill="#1f2937">
     ♟️ Communauté PriseEnPassant
