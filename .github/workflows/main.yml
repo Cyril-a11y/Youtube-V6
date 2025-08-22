@@ -73,13 +73,9 @@ jobs:
         run: python 03_process_comments.py
         continue-on-error: true
 
-      # 9) Commit coup_blanc.txt (force, avec timestamp pour éviter "no changes")
+      # 9) Commit coup_blanc.txt
       - name: Commit coup_blanc.txt
         run: |
-          git fetch origin main
-          git reset --hard origin/main
-          git clean -fd
-
           git config user.name "github-actions"
           git config user.email "actions@github.com"
 
@@ -121,13 +117,9 @@ jobs:
             sleep 5
           done
 
-      # 14) Commit updated game data (force)
+      # 14) Commit updated game data
       - name: Commit updated game data
         run: |
-          git fetch origin main
-          git reset --hard origin/main
-          git clean -fd
-
           git config user.name "github-actions"
           git config user.email "actions@github.com"
           git add -f data/position.fen data/dernier_coup.json data/move_history.json || true
@@ -145,13 +137,9 @@ jobs:
         run: python 06_generate_black_svg.py
         continue-on-error: true
 
-      # 16) Commit SVG & PNG thumbnail (force)
+      # 16) Commit SVG & PNG thumbnail
       - name: Commit SVG & PNG thumbnail
         run: |
-          git fetch origin main
-          git reset --hard origin/main
-          git clean -fd
-
           git config user.name "github-actions"
           git config user.email "actions@github.com"
           git add -f data/thumbnail_black.svg data/thumbnail_black.png || true
