@@ -66,14 +66,23 @@ jobs:
         run: python 03_process_comments.py
         continue-on-error: true
 
-      # 9) Commit coup_blanc.txt (force)
+      # 9) Commit coup_blanc.txt (force, sans l'écraser)
       - name: Commit coup_blanc.txt
         run: |
           git config user.name "github-actions"
           git config user.email "actions@github.com"
+
+          # Sauvegarder le coup calculé
+          COUP=$(cat data/coup_blanc.txt || echo "")
+
+          # Repartir propre
           git fetch origin main
           git reset --hard origin/main
-          git add -f data/coup_blanc.txt || true
+
+          # Restaurer le coup calculé
+          echo "$COUP" > data/coup_blanc.txt
+
+          git add -f data/coup_blanc.txt
           git commit -m "Update coup_blanc.txt [skip ci]" || echo "No changes"
           git push --force-with-lease origin HEAD:main
 
