@@ -66,15 +66,16 @@ jobs:
         run: python 03_process_comments.py
         continue-on-error: true
 
-      # 9) Commit coup_blanc.txt
+      # 9) Commit coup_blanc.txt (force)
       - name: Commit coup_blanc.txt
         run: |
           git config user.name "github-actions"
           git config user.email "actions@github.com"
-          git pull --rebase origin main || true
-          git add data/coup_blanc.txt || true
-          git diff --cached --quiet || git commit -m "Update coup_blanc.txt [skip ci]"
-          git push --force-with-lease origin main || true
+          git fetch origin main
+          git reset --hard origin/main
+          git add -f data/coup_blanc.txt || true
+          git commit -m "Update coup_blanc.txt [skip ci]" || echo "No changes"
+          git push --force-with-lease origin HEAD:main
 
       # 10) Play white move
       - name: Play white move
@@ -105,15 +106,16 @@ jobs:
             sleep 5
           done
 
-      # 14) Commit updated game data
+      # 14) Commit updated game data (force)
       - name: Commit updated game data
         run: |
           git config user.name "github-actions"
           git config user.email "actions@github.com"
-          git pull --rebase origin main || true
-          git add data/position.fen data/dernier_coup.json data/move_history.json || true
-          git diff --cached --quiet || git commit -m "Update game state after moves [skip ci]"
-          git push --force-with-lease origin main || true
+          git fetch origin main
+          git reset --hard origin/main
+          git add -f data/position.fen data/dernier_coup.json data/move_history.json || true
+          git commit -m "Update game state after moves [skip ci]" || echo "No changes"
+          git push --force-with-lease origin HEAD:main
 
       # 14bis) Delay to ensure black move is fully registered
       - name: Delay before generating SVG
@@ -126,12 +128,13 @@ jobs:
         run: python 06_generate_black_svg.py
         continue-on-error: true
 
-      # 16) Commit SVG & PNG thumbnail
+      # 16) Commit SVG & PNG thumbnail (force)
       - name: Commit SVG & PNG thumbnail
         run: |
           git config user.name "github-actions"
           git config user.email "actions@github.com"
-          git pull --rebase origin main || true
-          git add data/thumbnail_black.svg data/thumbnail_black.png || true
-          git diff --cached --quiet || git commit -m "Update black thumbnail [skip ci]"
-          git push --force-with-lease origin main || true
+          git fetch origin main
+          git reset --hard origin/main
+          git add -f data/thumbnail_black.svg data/thumbnail_black.png || true
+          git commit -m "Update black thumbnail [skip ci]" || echo "No changes"
+          git push --force-with-lease origin HEAD:main
