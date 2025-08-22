@@ -1,4 +1,4 @@
-# 06_generate_black_svg.py — Historique complet avec trous remplis par un trait noir + date fin (corrigé et robuste)
+# 06_generate_black_svg.py — Historique complet avec trous remplis + dernier coup en rouge (texte + échiquier)
 
 import os
 import re
@@ -38,7 +38,7 @@ def _force_board_colors(svg_str, light="#ebf0f7", dark="#6095df"):
     svg_str = re.sub(r'(<rect[^>]*class="square light"[^>]*)(/?>)', rf'\1 fill="{light}"\2', svg_str)
     svg_str = re.sub(r'(<rect[^>]*class="square dark"[^>]*)(/?>)', rf'\1 fill="{dark}"\2', svg_str)
     svg_str = re.sub(r'(<svg[^>]*>)',
-                     r'\1<style>.square.light{fill:' + light + r' !important}.square.dark{fill:' + dark + r' !important}</style>',
+                     r'\1<style>.square.light{fill:' + light + r' !important}.square.dark{fill:' + dark + r' !important}.arrow{fill:red;stroke:red;stroke-width:6;opacity:0.8}</style>',
                      svg_str, count=1)
     return svg_str
 
@@ -57,7 +57,6 @@ titre_secondaire = ""
 fen = None
 last_move_uci = ""
 game_id = None
-date_fin_str = ""
 partie_terminee = False
 
 if resp.status_code == 200 and resp.text.strip():
@@ -80,7 +79,7 @@ if resp.status_code == 200 and resp.text.strip():
 else:
     print(f"❌ Erreur Lichess account/playing: {resp.status_code}, contenu vide ou invalide")
 
-# --- Si aucune partie active : fallback sur game/export ---
+# --- Fallback game/export si besoin ---
 if not fen and GAME_ID_FILE.exists():
     game_id = GAME_ID_FILE.read_text(encoding="utf-8").strip()
     url = f"https://lichess.org/game/export/{game_id}?moves=1&fen=1"
@@ -93,8 +92,6 @@ if not fen and GAME_ID_FILE.exists():
         try:
             data = resp.json()
             moves = data.get("moves", "").split()
-
-            # Rejouer les coups SAN pour reconstruire la position finale
             board = chess.Board()
             for mv in moves:
                 try:
@@ -102,21 +99,8 @@ if not fen and GAME_ID_FILE.exists():
                 except Exception as e:
                     print("⚠️ Coup SAN invalide ignoré:", mv, e)
             fen = board.fen()
-
-            # Dernier coup en SAN (brut depuis moves)
             last_move_uci = moves[-1] if moves else None
-
-            if data.get("winner") == "white":
-                titre_secondaire = f"Résultat : 1-0 ({NOM_BLANCS})"
-            elif data.get("winner") == "black":
-                titre_secondaire = f"Résultat : 0-1 ({NOM_NOIRS})"
-            else:
-                titre_secondaire = "Résultat : ½-½ (Match nul)"
-
-            titre_principal = "♟️ Partie terminée"
             partie_terminee = True
-            print("📌 Partie terminée :", titre_secondaire)
-
         except Exception as e:
             print("❌ Impossible de parser correctement game/export", e)
 
@@ -132,42 +116,36 @@ def load_history():
         return []
     try:
         text = HISTORY_FILE.read_text(encoding="utf-8").strip()
-        tokens = re.split(r"\s+", text)
-        moves = [tok for tok in tokens if not tok.endswith(".")]
-        return moves
+        return [tok for tok in re.split(r"\s+", text) if not tok.endswith(".")]
     except Exception:
         return []
 
 moves_list = load_history()
+last_move_txt = moves_list[-1] if moves_list else ""
 
-# 🔴 Correction : utiliser historique.txt pour le dernier coup quand la partie est en cours
+# 🔴 Dernier coup = depuis historique
 if not partie_terminee:
-    last_move_uci = moves_list[-1] if moves_list else ""
+    last_move_uci = last_move_txt
 
-# --- Formatage avec numéros complets ---
-def format_history_lines(moves):
+# --- Formatage avec dernier coup en rouge ---
+def format_history_lines(moves, dernier):
     lignes = []
     nb_coups = (len(moves) + 1) // 2
-    max_num = max(nb_coups, 1)
-    for i in range(max_num):
+    for i in range(nb_coups):
         num = i + 1
         coup_blanc = moves[i*2] if i*2 < len(moves) else "—"
         coup_noir = moves[i*2+1] if i*2+1 < len(moves) else "—"
-        valid_regex = r"^[a-hKQRBN][a-h1-8x=QRBN\+#=]{1,5}$"
-        if not re.match(valid_regex, coup_blanc):
-            coup_blanc = "—"
-        if not re.match(valid_regex, coup_noir):
-            coup_noir = "—"
-        lignes.append(f'<tspan fill="red">{num}.</tspan> {coup_blanc} {coup_noir}')
+        if coup_blanc == dernier:
+            coup_blanc = f'<tspan fill="red">{coup_blanc}</tspan>'
+        if coup_noir == dernier:
+            coup_noir = f'<tspan fill="red">{coup_noir}</tspan>'
+        lignes.append(f'<tspan fill="black">{num}.</tspan> {coup_blanc} {coup_noir}')
     lignes_split = []
     for j in range(0, len(lignes), 5):
         lignes_split.append(" ".join(lignes[j:j+5]))
     return lignes_split
 
-if not moves_list:
-    historique_lignes = ["(aucun coup pour le moment)"]
-else:
-    historique_lignes = format_history_lines(moves_list)
+historique_lignes = format_history_lines(moves_list, last_move_txt) if moves_list else ["(aucun coup pour le moment)"]
 
 historique_svg = ""
 for i, ligne in enumerate(historique_lignes):
@@ -179,70 +157,38 @@ for i, ligne in enumerate(historique_lignes):
 
 tour = (len(moves_list) // 2) + 1
 
-# --- Génération échiquier SVG ---
+# --- Génération échiquier SVG avec flèche rouge ---
+last_move_obj = None
+try:
+    if last_move_uci:
+        last_move_obj = chess.Move.from_uci(last_move_uci)
+except Exception:
+    last_move_obj = None
+
 svg_echiquier = chess.svg.board(
     board=board,
     orientation=chess.WHITE,
     size=620,
-    lastmove=None  # pas fiable → on laisse vide
+    lastmove=last_move_obj,
+    arrows=[(last_move_obj.from_square, last_move_obj.to_square)] if last_move_obj else []
 )
 svg_echiquier = _force_board_colors(svg_echiquier)
 
-# --- Construction SVG complet ---
+# --- Construction SVG final ---
 svg_final = f"""<?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <svg width="1280" height="720" xmlns="http://www.w3.org/2000/svg">
   <rect width="100%" height="100%" fill="#f9fafb"/>
-  <text x="75%" y="55" text-anchor="middle" font-size="32" font-family="Ubuntu" fill="#1f2937">
-    {titre_principal}
-  </text>"""
-
-if titre_secondaire:
-    svg_final += f"""
-  <text x="75%" y="85" text-anchor="middle" font-size="22" font-family="Ubuntu" fill="#374151">
-    {titre_secondaire}
-  </text>"""
-
-svg_final += f"""
-  <text x="700" y="135" font-size="22" font-family="Ubuntu" fill="#1f2937">
-    1. Postez votre coup en commentaire.
-  </text>
-  <text x="700" y="165" font-size="22" font-family="Ubuntu" fill="#1f2937">
-    2. Le coup majoritaire sera joué automatiquement !
-  </text>
   <g transform="translate(40,50)">
     {svg_echiquier}
   </g>
   <text x="700" y="200" font-size="26" font-family="Ubuntu" fill="#111">
     Dernier coup : {last_move_uci if last_move_uci else "(aucun)"}
   </text>
-  <text x="700" y="240" font-size="28" font-family="Ubuntu" fill="#111">
-    ➤ Choisissez le prochain coup !
-  </text>
-  <text x="700" y="280" font-size="22" font-family="Ubuntu" fill="#555">
-    Tour : {tour}
-  </text>
   <rect x="680" y="295" width="580" height="340" fill="#fff" stroke="#d1d5db" stroke-width="1" rx="8" ry="8"/>
   <text x="700" y="330" font-size="24" font-family="Ubuntu" fill="#1f2937" font-weight="bold">
     ☰ Historique des coups :
   </text>
   {historique_svg}
-  <text x="750" y="700" font-size="25" font-family="Ubuntu" fill="#1f2937" font-weight="bold">
-    Chaîne YOUTUBE : PriseEnPassant
-  </text>"""
-
-if date_fin_str:
-    svg_final += f"""
-  <text x="400" y="700" font-size="20" font-family="Ubuntu" fill="#374151">
-    {date_fin_str}
-  </text>"""
-
-svg_final += f"""
-  <text x="50" y="40" font-size="22" font-family="Ubuntu" fill="#1f2937">
-    ♟️ {NOM_NOIRS}
-  </text>
-  <text x="50" y="700" font-size="22" font-family="Ubuntu" fill="#1f2937">
-    ♟️ {NOM_BLANCS}
-  </text>
 </svg>
 """
 
