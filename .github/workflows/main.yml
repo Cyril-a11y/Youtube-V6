@@ -21,6 +21,12 @@ jobs:
         with:
           fetch-depth: 0
 
+      # 🔄 Reset propre une seule fois au début
+      - name: Reset to origin/main
+        run: |
+          git fetch origin main
+          git reset --hard origin/main
+
       # 2) Setup Python
       - uses: actions/setup-python@v5
         with:
@@ -74,12 +80,6 @@ jobs:
 
           # Sauvegarder le coup calculé
           COUP=$(cat data/coup_blanc.txt || echo "")
-
-          # Repartir propre
-          git fetch origin main
-          git reset --hard origin/main
-
-          # Restaurer le coup calculé
           echo "$COUP" > data/coup_blanc.txt
 
           git add -f data/coup_blanc.txt
@@ -120,8 +120,6 @@ jobs:
         run: |
           git config user.name "github-actions"
           git config user.email "actions@github.com"
-          git fetch origin main
-          git reset --hard origin/main
           git add -f data/position.fen data/dernier_coup.json data/move_history.json || true
           git commit -m "Update game state after moves [skip ci]" || echo "No changes"
           git push --force-with-lease origin HEAD:main
@@ -142,8 +140,6 @@ jobs:
         run: |
           git config user.name "github-actions"
           git config user.email "actions@github.com"
-          git fetch origin main
-          git reset --hard origin/main
           git add -f data/thumbnail_black.svg data/thumbnail_black.png || true
           git commit --allow-empty -m "Update black thumbnail [skip ci]" || true
           git push --force-with-lease origin HEAD:main
