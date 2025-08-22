@@ -81,8 +81,6 @@ jobs:
 
           COUP=$(head -n 1 data/coup_blanc.txt || echo "")
           echo "$COUP" > data/coup_blanc.txt
-          # ✅ Ajout d'un timestamp invisible pour forcer une diff
-          echo "# updated at $(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> data/coup_blanc.txt
 
           git add -f data/coup_blanc.txt
           git commit -m "Update coup_blanc.txt [skip ci]" || echo "No changes"
