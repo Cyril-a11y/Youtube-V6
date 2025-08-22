@@ -140,6 +140,10 @@ def load_history():
 
 moves_list = load_history()
 
+# 🔴 Correction : utiliser historique.txt pour le dernier coup quand la partie est en cours
+if not partie_terminee:
+    last_move_uci = moves_list[-1] if moves_list else ""
+
 # --- Formatage avec numéros complets ---
 def format_history_lines(moves):
     lignes = []
@@ -180,7 +184,7 @@ svg_echiquier = chess.svg.board(
     board=board,
     orientation=chess.WHITE,
     size=620,
-    lastmove=None  # on ne tente pas UCI ici car SAN non compatible
+    lastmove=None  # pas fiable → on laisse vide
 )
 svg_echiquier = _force_board_colors(svg_echiquier)
 
