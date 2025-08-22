@@ -145,5 +145,5 @@ jobs:
           git fetch origin main
           git reset --hard origin/main
           git add -f data/thumbnail_black.svg data/thumbnail_black.png || true
-          git commit -m "Update black thumbnail [skip ci]" || echo "No changes"
+          git commit --allow-empty -m "Update black thumbnail [skip ci]" || true
           git push --force-with-lease origin HEAD:main
