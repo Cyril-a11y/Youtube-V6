@@ -21,13 +21,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      # 🔄 Reset propre une seule fois au début
-      - name: Reset to origin/main
-        run: |
-          git fetch origin main
-          git reset --hard origin/main
-          git clean -fd
-
+      
       # 2) Setup Python
       - uses: actions/setup-python@v5
         with:
