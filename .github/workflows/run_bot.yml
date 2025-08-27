@@ -125,7 +125,9 @@ jobs:
           r = requests.post(url, headers=headers)
           print(f"📤 POST {url} -> {r.status_code} {r.text}")
           if r.status_code != 200:
-              raise SystemExit(1)
+              print(f"⚠️ Coup envoyé mais réponse non-200: {r.status_code} {r.text}")
+              # NE PAS quitter ici, on continue pour écrire les fichiers
+
 
           # Sauvegarde FEN + dernier coup lisible
           fen_after_local = board.fen()
