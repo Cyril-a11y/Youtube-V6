@@ -16,12 +16,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1) Checkout repo complet
+      # 1) Checkout repo complet (on garde l'état sans reset destructif)
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      
       # 2) Setup Python
       - uses: actions/setup-python@v5
         with:
@@ -124,7 +123,7 @@ jobs:
           echo "⏳ Pause 60s pour s'assurer que le coup noir est bien enregistré..."
           sleep 60
 
-      # 15) Generate black SVG + PNG
+      # 15) Generate black SVG & PNG
       - name: Generate black SVG & PNG
         run: python 06_generate_black_svg.py
         continue-on-error: true
