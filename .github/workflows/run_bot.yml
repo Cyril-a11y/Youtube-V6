@@ -126,8 +126,7 @@ jobs:
           print(f"📤 POST {url} -> {r.status_code} {r.text}")
           if r.status_code != 200:
               print(f"⚠️ Coup envoyé mais réponse non-200: {r.status_code} {r.text}")
-              # NE PAS quitter ici, on continue pour écrire les fichiers
-
+              # On continue quand même
 
           # Sauvegarde FEN + dernier coup lisible
           fen_after_local = board.fen()
@@ -215,6 +214,16 @@ jobs:
           PY
 
           python3 play_move.py
+
+      # 3.5) Debug avant commit
+      - name: Debug files before commit
+        run: |
+          echo "=== LS DATA ==="
+          ls -la data
+          echo "=== CONTENU historique.txt ==="
+          cat data/historique.txt || echo "❌ historique.txt introuvable"
+          echo "=== GIT STATUS ==="
+          git status --short
 
       # 4) Commit & push (force direct, pas de rebase)
       - name: Commit & Push changes
