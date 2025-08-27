@@ -140,11 +140,6 @@ jobs:
               encoding="utf-8"
           )
 
-          # === TEST: écrire directement "test" dans historique.txt ===
-          with open(data_dir / "historique.txt", "a", encoding="utf-8") as f:
-              f.write("test\n")
-          print("✍️ Test écrit dans historique.txt")
-
           # === Historique: coup blanc depuis fichier + coup noir depuis lastMove ===
           try:
               coup_blanc_file = data_dir / "coup_blanc.txt"
