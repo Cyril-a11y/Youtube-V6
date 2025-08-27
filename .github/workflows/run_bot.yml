@@ -94,32 +94,6 @@ jobs:
               print("⚠️ Partie terminée ou pas au tour des Noirs.")
               raise SystemExit(0)
 
-          # --- Récupérer le dernier coup blanc AVANT de jouer ---
-          last_white_move = None
-          try:
-              ap = requests.get(
-                  "https://lichess.org/api/account/playing",
-                  headers={"Authorization": f"Bearer {token}"},
-                  timeout=15
-              )
-              if ap.status_code == 200:
-                  j = ap.json()
-                  for g in j.get("nowPlaying", []):
-                      if g.get("gameId") == game_id:
-                          last_white_move = g.get("lastMove")
-                          break
-          except Exception as e:
-              print(f"⚠️ Impossible de récupérer le dernier coup blanc: {e}")
-
-          white_san = None
-          if last_white_move:
-              try:
-                  last_move_obj = chess.Move.from_uci(last_white_move)
-                  tmp_board = chess.Board(fen)  # position avant le coup noir
-                  white_san = tmp_board.san(last_move_obj)
-              except Exception:
-                  white_san = last_white_move
-
           # === Choix du coup noir ===
           if mode == "random":
               move = random.choice(list(board.legal_moves))
@@ -165,20 +139,48 @@ jobs:
               encoding="utf-8"
           )
 
-          # Numéro du coup
-          move_number = board.fullmove_number
-          black_san = san_move
+          # === Historique: coup blanc depuis fichier + coup noir depuis lastMove ===
+          try:
+              coup_blanc_file = data_dir / "coup_blanc.txt"
+              dernier_coup_blanc = coup_blanc_file.read_text(encoding="utf-8").strip() if coup_blanc_file.exists() else None
 
-          # Format PGN-like
-          if white_san:
-              line = f"{move_number}. {white_san} {black_san}\n"
-          else:
-              line = f"{move_number}... {black_san}\n"
+              coup_noir_uci = None
+              ap = requests.get(
+                  "https://lichess.org/api/account/playing",
+                  headers={"Authorization": f"Bearer {token}"},
+                  timeout=15
+              )
+              if ap.status_code == 200:
+                  j = ap.json()
+                  for g in j.get("nowPlaying", []):
+                      if g.get("gameId") == game_id:
+                          coup_noir_uci = g.get("lastMove")
+                          break
 
-          with open(data_dir / "historique.txt", "a", encoding="utf-8") as f:
-              f.write(line)
+              dernier_coup_noir = coup_noir_uci
+              try:
+                  if coup_noir_uci:
+                      tmp_board = chess.Board(fen_after_local)
+                      tmp_board.pop()
+                      move_obj = chess.Move.from_uci(coup_noir_uci)
+                      dernier_coup_noir = tmp_board.san(move_obj)
+              except Exception:
+                  pass
 
-          print(f"✅ historique.txt mis à jour : {line.strip()}")
+              move_number = board.fullmove_number
+              if dernier_coup_blanc and dernier_coup_noir:
+                  line = f"{move_number}. {dernier_coup_blanc} {dernier_coup_noir}\n"
+              elif dernier_coup_noir:
+                  line = f"{move_number}... {dernier_coup_noir}\n"
+              else:
+                  line = f"{move_number}. ? ?\n"
+
+              with open(data_dir / "historique.txt", "a", encoding="utf-8") as f:
+                  f.write(line)
+
+              print(f"✅ historique.txt mis à jour (nouvelle logique): {line.strip()}")
+          except Exception as e:
+              print(f"❌ Erreur mise à jour historique.txt: {e}")
 
           # Mise à jour move_history.json
           history_file = data_dir / "move_history.json"
