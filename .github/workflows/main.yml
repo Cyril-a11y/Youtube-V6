@@ -115,12 +115,12 @@ jobs:
             sleep 5
           done
 
-      # 14) Commit updated game data
+      # 14) Commit updated game data (inclure historique.txt !)
       - name: Commit updated game data
         run: |
           git config user.name "github-actions"
           git config user.email "actions@github.com"
-          git add -f data/position.fen data/dernier_coup.json data/move_history.json || true
+          git add -f data/position.fen data/dernier_coup.json data/move_history.json data/historique.txt || true
           git commit -m "Update game state after moves [skip ci]" || echo "No changes"
           git push --force origin HEAD:main
 
