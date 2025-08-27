@@ -136,4 +136,6 @@ jobs:
           git status --short
 
           git commit -m "Update game state and thumbnails [skip ci]" || echo "No changes"
+
+          git pull --rebase origin main || true
           git push origin HEAD:main
