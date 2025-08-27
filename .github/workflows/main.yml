@@ -66,7 +66,7 @@ jobs:
         run: python 03_process_comments.py
         continue-on-error: true
 
-      # 9) Commit coup_blanc.txt
+      # 9) Commit coup_blanc.txt (commit dédié)
       - name: Commit coup_blanc.txt
         run: |
           git config user.name "github-actions"
@@ -80,7 +80,7 @@ jobs:
           git checkout -- .github/workflows || true
 
           git commit -m "Update coup_blanc.txt [skip ci]" || echo "No changes"
-          git push --force origin HEAD:main
+          git push origin HEAD:main
 
       # 10) Play white move
       - name: Play white move
@@ -111,23 +111,7 @@ jobs:
             sleep 5
           done
 
-      # 14) Commit updated game data (inclure historique.txt + move_history.json !)
-      - name: Commit updated game data
-        run: |
-          git config user.name "github-actions"
-          git config user.email "actions@github.com"
-
-          git add -f data/position.fen data/dernier_coup.json data/move_history.json data/historique.txt || true
-          git restore --staged .github/workflows || true
-          git checkout -- .github/workflows || true
-
-          echo "=== DEBUG git status ==="
-          git status --short
-
-          git commit -m "Update game state after moves [skip ci]" || echo "No changes"
-          git push --force origin HEAD:main
-
-      # 14bis) Delay to ensure black move is fully registered
+      # 14) Delay to ensure black move is fully registered
       - name: Delay before generating SVG
         run: |
           echo "⏳ Pause 60s pour s'assurer que le coup noir est bien enregistré..."
@@ -138,8 +122,8 @@ jobs:
         run: python 06_generate_black_svg.py
         continue-on-error: true
 
-      # 16) Commit SVG & PNG thumbnail (inclure aussi tous les fichiers critiques !)
-      - name: Commit SVG & PNG thumbnail
+      # 16) Commit all updated game data (one final commit for everything)
+      - name: Commit final game data
         run: |
           git config user.name "github-actions"
           git config user.email "actions@github.com"
@@ -148,5 +132,8 @@ jobs:
           git restore --staged .github/workflows || true
           git checkout -- .github/workflows || true
 
-          git commit --allow-empty -m "Update black thumbnail [skip ci]" || true
-          git push --force origin HEAD:main
+          echo "=== DEBUG git status (final commit) ==="
+          git status --short
+
+          git commit -m "Update game state and thumbnails [skip ci]" || echo "No changes"
+          git push origin HEAD:main
