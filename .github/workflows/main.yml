@@ -128,14 +128,15 @@ jobs:
           git config user.name "github-actions"
           git config user.email "actions@github.com"
 
-          git add -f data/position.fen data/dernier_coup.json data/move_history.json data/historique.txt data/thumbnail_black.svg data/thumbnail_black.png || true
+          # Ajoute absolument tout le contenu de data/ (ajouts, suppressions, modifs)
+          git add -A data/ || true
           git restore --staged .github/workflows || true
           git checkout -- .github/workflows || true
 
           echo "=== DEBUG git status (final commit) ==="
           git status --short
 
-          git commit -m "Update game state and thumbnails [skip ci]" || echo "No changes"
+          git commit -m "Update all game data [skip ci]" || echo "No changes"
 
           git pull --rebase origin main || true
           git push origin HEAD:main
