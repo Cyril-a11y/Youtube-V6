@@ -1,4 +1,4 @@
-# 06_generate_black_svg.py — Historique via move_history.json (fallback historique.txt) + notation française
+# 06_generate_black_svg.py — Dessin via FEN live, historique via move_history.json (fallback txt), notation française
 
 import os
 import re
@@ -30,11 +30,11 @@ NOM_NOIRS = f"Stockfish {ELO_APPROX} Elo"
 # --- Conversion SAN en notation française ---
 def san_to_french(san: str) -> str:
     mapping = {
-        "K": "R",  # Roi
-        "Q": "D",  # Dame
-        "R": "T",  # Tour
-        "B": "F",  # Fou
-        "N": "C",  # Cavalier
+        "K": "R",  # King → Roi
+        "Q": "D",  # Queen → Dame
+        "R": "T",  # Rook → Tour
+        "B": "F",  # Bishop → Fou
+        "N": "C",  # Knight → Cavalier
     }
     for eng, fr in mapping.items():
         san = san.replace(eng, fr)
@@ -85,19 +85,19 @@ def load_history_txt():
     except Exception:
         return []
 
-# --- Reconstruire l’historique ---
+# --- Construire moves_san (FR) ---
 history = load_history_json()
-board = chess.Board()
+board_tmp = chess.Board()
 moves_san, last_move_uci = [], None
 
 if history:  # ✅ utiliser move_history.json
     for entry in history:
         try:
             move = chess.Move.from_uci(entry["coup"])
-            san = board.san(move)
+            san = board_tmp.san(move)
             san_fr = san_to_french(san)
             moves_san.append(san_fr)
-            board.push(move)
+            board_tmp.push(move)
             last_move_uci = entry["coup"]
         except Exception:
             continue
@@ -106,15 +106,36 @@ else:  # 🔄 fallback sur historique.txt
     for uci in moves_txt:
         try:
             move = chess.Move.from_uci(uci)
-            san = board.san(move)
+            san = board_tmp.san(move)
             san_fr = san_to_french(san)
             moves_san.append(san_fr)
-            board.push(move)
+            board_tmp.push(move)
             last_move_uci = uci
         except Exception:
             continue
 
 tour = (len(moves_san) + 1) // 2
+
+# --- Récupération FEN live (pour dessin) ---
+fen = None
+token = os.getenv("LICHESS_BOT_TOKEN")
+if token:
+    try:
+        resp = requests.get("https://lichess.org/api/account/playing",
+                            headers={"Authorization": f"Bearer {token}"}, timeout=10)
+        if resp.status_code == 200:
+            data = resp.json()
+            games = data.get("nowPlaying", [])
+            if games:
+                fen = games[0]["fen"]
+    except Exception as e:
+        print("⚠️ Erreur parsing JSON Lichess:", e)
+
+if not fen:
+    print("❌ Impossible de récupérer la FEN live.")
+    exit(1)
+
+board = chess.Board(fen)
 last_move_obj = chess.Move.from_uci(last_move_uci) if last_move_uci else None
 
 # --- SVG échiquier ---
