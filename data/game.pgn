@@ -12,8 +12,8 @@
 [BlackTitle "BOT"]
 [Variant "Standard"]
 [TimeControl "-"]
-[ECO "A50"]
-[Opening "Indian Defense: Normal Variation"]
+[ECO "E22"]
+[Opening "Nimzo-Indian Defense: Spielmann Variation"]
 [Termination "Unterminated"]
 
 1. d4 Nf6 2. c4 e6 3. Nc3 *
