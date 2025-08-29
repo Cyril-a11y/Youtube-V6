@@ -1,0 +1,21 @@
+[Event "casual correspondence game"]
+[Site "https://lichess.org/hzVrIo7H"]
+[Date "2025.08.29"]
+[White "PriseEnPassantYT"]
+[Black "PriseEnPassantBot"]
+[Result "*"]
+[GameId "hzVrIo7H"]
+[UTCDate "2025.08.29"]
+[UTCTime "09:15:28"]
+[WhiteElo "1500"]
+[BlackElo "2000"]
+[BlackTitle "BOT"]
+[Variant "Standard"]
+[TimeControl "-"]
+[ECO "B12"]
+[Opening "Caro-Kann Defense"]
+[Termination "Unterminated"]
+
+1. e4 c6 2. d4 d6 3. h3 *
+
+
