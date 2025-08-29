@@ -1,4 +1,4 @@
-# 06_generate_black_svg.py — Historique complet + esthétique verrouillée + dernier coup en rouge (texte + échiquier)
+# 06_generate_black_svg.py — Historique via historique.txt + échiquier FEN live
 
 import os
 import re
@@ -15,7 +15,6 @@ SVG_FILE = DATA_DIR / "thumbnail_black.svg"
 PNG_FILE = DATA_DIR / "thumbnail_black.png"
 BOT_ELO_FILE = DATA_DIR / "bot_elo.txt"
 HISTORY_FILE = DATA_DIR / "historique.txt"
-GAME_ID_FILE = DATA_DIR / "game_id.txt"
 
 # --- Lecture Elo du bot ---
 if not BOT_ELO_FILE.exists():
@@ -42,92 +41,60 @@ def _force_board_colors(svg_str, light="#ebf0f7", dark="#6095df"):
                      svg_str, count=1)
     return svg_str
 
-# --- API Lichess ---
-print("📥 Récupération de l'état de la partie en cours (live)…")
-token = os.getenv("LICHESS_BOT_TOKEN")
-if not token:
-    print("❌ LICHESS_BOT_TOKEN manquant.")
-    exit(1)
-
-resp = requests.get("https://lichess.org/api/account/playing",
-                    headers={"Authorization": f"Bearer {token}"}, timeout=10)
-
-titre_principal = "♟️ Partie interactive en cours !"
-titre_secondaire = ""
-fen = None
-last_move_uci = ""
-game_id = None
-partie_terminee = False
-
-if resp.status_code == 200 and resp.text.strip():
-    try:
-        data = resp.json()
-    except Exception:
-        print("⚠️ Réponse Lichess non-JSON, brut =", resp.text[:200])
-        data = {}
-    games = data.get("nowPlaying", [])
-    if games:
-        g = games[0]
-        game_id = g["gameId"]
-        fen = g["fen"]
-        last_move_uci = g.get("lastMove", "")
-        print(f"♟️ Partie détectée: {game_id}")
-        print("FEN actuelle:", fen)
-        print("Dernier coup (UCI brut):", last_move_uci)
-    else:
-        print("⚠️ Aucune partie en cours trouvée → tentative via game/export")
-else:
-    print(f"❌ Erreur Lichess account/playing: {resp.status_code}, contenu vide ou invalide")
-
-# --- Fallback game/export si besoin ---
-if not fen and GAME_ID_FILE.exists():
-    game_id = GAME_ID_FILE.read_text(encoding="utf-8").strip()
-    url = f"https://lichess.org/game/export/{game_id}?moves=1&fen=1"
-    resp = requests.get(url, headers={
-        "Authorization": f"Bearer {token}",
-        "Accept": "application/json"
-    }, timeout=10)
-
-    if resp.status_code == 200 and resp.text.strip():
-        try:
-            data = resp.json()
-            moves = data.get("moves", "").split()
-            board = chess.Board()
-            for mv in moves:
-                try:
-                    board.push_san(mv)
-                except Exception as e:
-                    print("⚠️ Coup SAN invalide ignoré:", mv, e)
-            fen = board.fen()
-            last_move_uci = moves[-1] if moves else None
-            partie_terminee = True
-        except Exception as e:
-            print("❌ Impossible de parser correctement game/export", e)
-
-# --- Vérification FEN ---
-if not fen:
-    print("❌ Impossible de récupérer la FEN.")
-    exit(1)
-board = chess.Board(fen)
-
 # --- Historique ---
 def load_history():
     if not HISTORY_FILE.exists():
         return []
     try:
         text = HISTORY_FILE.read_text(encoding="utf-8").strip()
-        return [tok for tok in re.split(r"\s+", text) if not tok.endswith(".")]
+        return [tok for tok in re.split(r"\s+", text) if tok and not tok.endswith(".")]
     except Exception:
         return []
 
 moves_list = load_history()
 last_move_txt = moves_list[-1] if moves_list else ""
+tour = (len(moves_list) // 2) + 1
 
-# 🔴 Dernier coup = depuis historique
-if not partie_terminee:
-    last_move_uci = last_move_txt
+# --- Récupération FEN live ---
+fen = None
+token = os.getenv("LICHESS_BOT_TOKEN")
+if token:
+    resp = requests.get("https://lichess.org/api/account/playing",
+                        headers={"Authorization": f"Bearer {token}"}, timeout=10)
+    if resp.status_code == 200:
+        try:
+            data = resp.json()
+            games = data.get("nowPlaying", [])
+            if games:
+                fen = games[0]["fen"]
+        except Exception as e:
+            print("⚠️ Erreur parsing JSON Lichess:", e)
 
-# --- Formatage avec dernier coup en rouge ---
+if not fen:
+    print("❌ Impossible de récupérer la FEN.")
+    exit(1)
+
+board = chess.Board(fen)
+
+# --- Dernier coup en objet UCI (si possible) ---
+last_move_obj = None
+try:
+    if last_move_txt:
+        last_move_obj = chess.Move.from_uci(last_move_txt)
+except Exception:
+    last_move_obj = None
+
+# --- SVG échiquier ---
+svg_echiquier = chess.svg.board(
+    board=board,
+    orientation=chess.WHITE,
+    size=620,
+    lastmove=last_move_obj,
+    arrows=[(last_move_obj.from_square, last_move_obj.to_square)] if last_move_obj else []
+)
+svg_echiquier = _force_board_colors(svg_echiquier)
+
+# --- Formatage historique ---
 def format_history_lines(moves, dernier):
     lignes = []
     nb_coups = (len(moves) + 1) // 2
@@ -155,31 +122,12 @@ for i, ligne in enumerate(historique_lignes):
         {ligne}
     </text>"""
 
-tour = (len(moves_list) // 2) + 1
-
-# --- Génération échiquier SVG avec flèche rouge ---
-last_move_obj = None
-try:
-    if last_move_uci:
-        last_move_obj = chess.Move.from_uci(last_move_uci)
-except Exception:
-    last_move_obj = None
-
-svg_echiquier = chess.svg.board(
-    board=board,
-    orientation=chess.WHITE,
-    size=620,
-    lastmove=last_move_obj,
-    arrows=[(last_move_obj.from_square, last_move_obj.to_square)] if last_move_obj else []
-)
-svg_echiquier = _force_board_colors(svg_echiquier)
-
-# --- Construction SVG final (esthétique verrouillée) ---
+# --- Construction SVG final ---
 svg_final = f"""<?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <svg width="1280" height="720" xmlns="http://www.w3.org/2000/svg">
   <rect width="100%" height="100%" fill="#f9fafb"/>
   <text x="75%" y="55" text-anchor="middle" font-size="32" font-family="Ubuntu" fill="#1f2937">
-    {titre_principal}
+    ♟️ Partie interactive en cours !
   </text>
   <text x="700" y="115" font-size="22" font-family="Ubuntu" fill="#1f2937">
     1. Postez votre coup en commentaire.
@@ -191,7 +139,7 @@ svg_final = f"""<?xml version="1.0" encoding="UTF-8" standalone="no"?>
     {svg_echiquier}
   </g>
   <text x="700" y="200" font-size="26" font-family="Ubuntu" fill="#111">
-    Dernier coup : {last_move_uci if last_move_uci else "(aucun)"}
+    Dernier coup : {last_move_txt if last_move_txt else "(aucun)"}
   </text>
   <text x="700" y="240" font-size="28" font-family="Ubuntu" fill="#111">
     ➤ Choisissez le prochain coup !
