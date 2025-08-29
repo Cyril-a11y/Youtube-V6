@@ -111,10 +111,37 @@ jobs:
               move = result.move
               engine.quit()
 
-          # Calcul SAN du coup noir
-          san_move = board.san(move)
+          # Calcul UCI + SAN
           uci_move = move.uci()
+          try:
+              san_move = board.san(move)
+          except Exception:
+              san_move = uci_move  # fallback
           print(f"🤖 Coup choisi: {san_move} ({uci_move})")
+
+          # ✅ Mise à jour move_history.json immédiatement
+          history_file = data_dir / "move_history.json"
+          try:
+              if history_file.exists():
+                  history = json.loads(history_file.read_text(encoding="utf-8"))
+                  if not isinstance(history, list):
+                      print("⚠️ move_history.json corrompu → réinitialisé")
+                      history = []
+              else:
+                  history = []
+          except Exception as e:
+              print(f"⚠️ Erreur lecture move_history.json: {e} → réinitialisé")
+              history = []
+
+          history.append({
+              "couleur": "noir",
+              "coup": uci_move,
+              "fen_apres": board.fen(),  # FEN avant push
+              "horodatage": datetime.now(timezone.utc).isoformat()
+          })
+
+          history_file.write_text(json.dumps(history, ensure_ascii=False, indent=2), encoding="utf-8")
+          print(f"✅ Coup noir ajouté à move_history.json ({uci_move})")
 
           # Pousser le coup localement
           board.push(move)
@@ -139,33 +166,7 @@ jobs:
               encoding="utf-8"
           )
 
-          # === Mise à jour move_history.json robuste ===
-          history_file = data_dir / "move_history.json"
-          try:
-              if history_file.exists():
-                  history = json.loads(history_file.read_text(encoding="utf-8"))
-                  if not isinstance(history, list):
-                      print("⚠️ move_history.json n'est pas une liste → réinitialisé")
-                      history = []
-              else:
-                  history = []
-          except Exception as e:
-              print(f"⚠️ Erreur lecture move_history.json: {e} → réinitialisé")
-              history = []
-
-          entry = {
-              "couleur": "noir",
-              "coup": uci_move,
-              "fen_apres": fen_after_local,
-              "horodatage": datetime.now(timezone.utc).isoformat()
-          }
-          history.append(entry)
-
-          history_file.write_text(
-              json.dumps(history, ensure_ascii=False, indent=2),
-              encoding="utf-8"
-          )
-          print(f"✅ Coup noir ajouté à move_history.json ({uci_move})")
+          print("✅ position.fen et dernier_coup.json mis à jour")
           PY
 
           python3 play_move.py
