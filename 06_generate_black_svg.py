@@ -52,19 +52,19 @@ def _force_board_colors(svg_str, light="#ebf0f7", dark="#6095df", highlight="#30
         r'''\1<style>
             .square.light{fill:''' + light + r''' !important}
             .square.dark{fill:''' + dark + r''' !important}
-            .lastmove{fill:''' + highlight + r''' !important; opacity:0.85;}
-            .arrow{fill:none;stroke:red;stroke-width:2;opacity:0.7;stroke-linecap:round;}
+            .lastmove{fill:''' + highlight + r''' !important}
+            .arrow{fill:red;stroke:red;stroke-width:3;opacity:1;stroke-linecap:round;}
         </style>''',
         svg_str, count=1
     )
 
-    # Flèche custom : fine et élégante
+    # Flèche custom : nette et bien proportionnée
     svg_str = svg_str.replace(
         '<marker id="arrowhead"',
-        '<marker id="arrowhead" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">'
+        '<marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">'
     ).replace(
         '<polygon points="0,0 10,3.5 0,7"',
-        '<path d="M1,1 Q0,3 1,5 L8,3 Z"'
+        '<path d="M1,1 Q0,3.5 1,6 L9,3.5 Z"'
     )
 
     return svg_str
