@@ -40,7 +40,7 @@ def _force_board_colors(svg_str, light="#ebf0f7", dark="#6095df"):
         r'(<svg[^>]*>)',
         r'\1<style>.square.light{fill:' + light +
         r' !important}.square.dark{fill:' + dark +
-        r' !important}.arrow{fill:red;stroke:red;stroke-width:3;opacity:0.6}</style>',  # 🔴 flèche plus fine et discrète
+        r' !important}.arrow{fill:red;stroke:red;stroke-width:2;opacity:0.6;stroke-linecap:round}</style>',  # 🔴 plus fine + arrondie
         svg_str, count=1
     )
     return svg_str
