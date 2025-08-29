@@ -1,4 +1,4 @@
-# 06_generate_black_svg.py — Historique via move_history.json (fallback historique.txt)
+# 06_generate_black_svg.py — Historique via move_history.json (fallback historique.txt) + notation française
 
 import os
 import re
@@ -26,6 +26,19 @@ except Exception:
     raise SystemExit("❌ Contenu de bot_elo.txt invalide.")
 NOM_BLANCS = "Communauté PriseEnPassant"
 NOM_NOIRS = f"Stockfish {ELO_APPROX} Elo"
+
+# --- Conversion SAN en notation française ---
+def san_to_french(san: str) -> str:
+    mapping = {
+        "K": "R",  # Roi
+        "Q": "D",  # Dame
+        "R": "T",  # Tour
+        "B": "F",  # Fou
+        "N": "C",  # Cavalier
+    }
+    for eng, fr in mapping.items():
+        san = san.replace(eng, fr)
+    return san
 
 # --- Couleurs échiquier + flèche ---
 def _force_board_colors(svg_str, light="#ebf0f7", dark="#6095df"):
@@ -82,7 +95,8 @@ if history:  # ✅ utiliser move_history.json
         try:
             move = chess.Move.from_uci(entry["coup"])
             san = board.san(move)
-            moves_san.append(san)
+            san_fr = san_to_french(san)
+            moves_san.append(san_fr)
             board.push(move)
             last_move_uci = entry["coup"]
         except Exception:
@@ -93,7 +107,8 @@ else:  # 🔄 fallback sur historique.txt
         try:
             move = chess.Move.from_uci(uci)
             san = board.san(move)
-            moves_san.append(san)
+            san_fr = san_to_french(san)
+            moves_san.append(san_fr)
             board.push(move)
             last_move_uci = uci
         except Exception:
@@ -138,9 +153,7 @@ historique_svg = "".join(
 svg_final = f"""<?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <svg width="1280" height="720" xmlns="http://www.w3.org/2000/svg">
   <rect width="100%" height="100%" fill="#f9fafb"/>
-  <text x="75%" y="55" text-anchor="middle" font-size="32" font-family="Ubuntu" fill="#1f2937">
-    ♟️ Partie interactive en cours !
-  </text>
+  <text x="75%" y="55" text-anchor="middle" font-size="32" font-family="Ubuntu" fill="#1f2937">♟️ Partie interactive en cours !</text>
   <text x="700" y="115" font-size="22" font-family="Ubuntu" fill="#1f2937">1. Postez votre coup en commentaire.</text>
   <text x="700" y="145" font-size="22" font-family="Ubuntu" fill="#1f2937">2. Le coup majoritaire sera joué automatiquement !</text>
   <g transform="translate(40,50)">{svg_echiquier}</g>
