@@ -150,7 +150,7 @@ svg_echiquier = svg_echiquier.replace(
     '<polygon points="0,0 7,3.5 0,7"'
 ).replace(
     'stroke-width="3"',
-    'stroke-width="2.2" opacity="0.8"'
+    'stroke-width="1.8" opacity="0.8"'
 )
 
 # --- Historique formaté ---
