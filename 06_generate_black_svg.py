@@ -36,9 +36,13 @@ def _force_board_colors(svg_str, light="#ebf0f7", dark="#6095df"):
     svg_str = re.sub(r'(<rect[^>]*class="square dark"[^>]*?)\s*fill="[^"]+"', r'\1', svg_str)
     svg_str = re.sub(r'(<rect[^>]*class="square light"[^>]*)(/?>)', rf'\1 fill="{light}"\2', svg_str)
     svg_str = re.sub(r'(<rect[^>]*class="square dark"[^>]*)(/?>)', rf'\1 fill="{dark}"\2', svg_str)
-    svg_str = re.sub(r'(<svg[^>]*>)',
-                     r'\1<style>.square.light{fill:' + light + r' !important}.square.dark{fill:' + dark + r' !important}.arrow{fill:red;stroke:red;stroke-width:6;opacity:0.8}</style>',
-                     svg_str, count=1)
+    svg_str = re.sub(
+        r'(<svg[^>]*>)',
+        r'\1<style>.square.light{fill:' + light +
+        r' !important}.square.dark{fill:' + dark +
+        r' !important}.arrow{fill:red;stroke:red;stroke-width:3;opacity:0.6}</style>',  # 🔴 flèche plus fine et discrète
+        svg_str, count=1
+    )
     return svg_str
 
 # --- Historique ---
@@ -106,7 +110,8 @@ def format_history_lines(moves, dernier):
             coup_blanc = f'<tspan fill="red">{coup_blanc}</tspan>'
         if coup_noir == dernier:
             coup_noir = f'<tspan fill="red">{coup_noir}</tspan>'
-        lignes.append(f'<tspan fill="black">{num}.</tspan> {coup_blanc} {coup_noir}')
+        # 🔴 numéro du coup en rouge et gras
+        lignes.append(f'<tspan fill="red" font-weight="bold">{num}.</tspan> {coup_blanc} {coup_noir}')
     lignes_split = []
     for j in range(0, len(lignes), 5):
         lignes_split.append(" ".join(lignes[j:j+5]))
