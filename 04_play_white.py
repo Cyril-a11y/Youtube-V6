@@ -1,4 +1,5 @@
-# 04_play_white.py — version "account/playing" fiable sans position_before_white.json
+# 04_play_white.py — version "account/playing" fiable, mise à jour move_history.json immédiate
+
 import os
 import requests
 import json
@@ -164,17 +165,15 @@ if __name__ == "__main__":
 
     log(f"Coup joué : {move_uci} ({san_str})", "ok")
 
-    time.sleep(2)
+    # ✅ Mettre à jour l’état local immédiatement
+    board.push(chess.Move.from_uci(move_uci))
+    update_position_files(board.fen(), move_uci)
+    append_move_to_history("blanc", move_uci, board.fen())
 
+    # (optionnel) on archive le PGN après une petite attente
+    time.sleep(2)
     pgn_after = download_pgn(game_id)
     if pgn_after:
-        game_after = chess.pgn.read_game(io.StringIO(pgn_after))
-        board_after = game_after.board()
-        last_move_after = None
-        for move in game_after.mainline_moves():
-            last_move_after = move.uci()
-            board_after.push(move)
-        update_position_files(board_after.fen(), last_move_after)
-        append_move_to_history("blanc", last_move_after, board_after.fen())
+        PGN_FILE.write_text(pgn_after, encoding="utf-8")
 
     COUP_BLANCS_FILE.unlink(missing_ok=True)
