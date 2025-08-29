@@ -82,5 +82,11 @@
     "coup": "b1c3",
     "fen_apres": "rn1qkb1r/pp3pp1/3pb2p/2p5/2P1n3/P1N2N1P/1P3PP1/R1BQKB1R b KQkq - 1 9",
     "horodatage": "2025-08-29T15:08:43.915762+00:00"
+  },
+  {
+    "couleur": "noir",
+    "coup": "e4c3",
+    "fen_apres": "rn1qkb1r/pp3pp1/3pb2p/2p5/2P5/P1n2N1P/1P3PP1/R1BQKB1R w KQkq - 0 10",
+    "horodatage": "2025-08-29T15:09:12.491941+00:00"
   }
 ]
