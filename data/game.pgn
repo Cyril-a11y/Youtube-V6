@@ -12,10 +12,10 @@
 [BlackTitle "BOT"]
 [Variant "Standard"]
 [TimeControl "-"]
-[ECO "B00"]
-[Opening "King's Pawn Game"]
+[ECO "B12"]
+[Opening "Caro-Kann Defense"]
 [Termination "Unterminated"]
 
-1. e4 *
+1. e4 c6 2. d4 *
 
 
