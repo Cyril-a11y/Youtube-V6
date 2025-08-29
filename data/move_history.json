@@ -1,1 +1,8 @@
-[]
+[
+  {
+    "couleur": "noir",
+    "coup": "c7c6",
+    "fen_apres": "rnbqkbnr/pp1ppppp/2p5/8/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2",
+    "horodatage": "2025-08-29T09:18:12.251038+00:00"
+  }
+]
