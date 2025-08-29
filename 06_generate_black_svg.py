@@ -60,7 +60,7 @@ def _force_board_colors(svg_str, light="#ebf0f7", dark="#6095df"):
     )
     svg_str = svg_str.replace(
         '<marker id="arrowhead"',
-        '<marker id="arrowhead" markerWidth="12" markerHeight="8" refX="6" refY="4" orient="auto">'
+        '<marker id="arrowhead" markerWidth="8" markerHeight="6" refX="6" refY="4" orient="auto">'
     ).replace(
         '<polygon points="0,0 10,3.5 0,7"',
         '<path d="M1,1 Q0,4 1,7 L10,4 Z"'
