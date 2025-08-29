@@ -1,5 +1,5 @@
 {
-  "dernier_coup": null,
-  "fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
-  "horodatage": "2025-08-29T20:39:42.599261+00:00"
+  "dernier_coup": "e2e4",
+  "fen": "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1",
+  "horodatage": "2025-08-29T20:41:09.027855+00:00"
 }
