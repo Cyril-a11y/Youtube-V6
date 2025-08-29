@@ -186,7 +186,7 @@ svg_final = f"""<?xml version="1.0" encoding="UTF-8" standalone="no"?>
   <text x="700" y="200" font-size="26" font-family="Ubuntu" fill="#111">Dernier coup : {moves_san[-1] if moves_san else "(aucun)"}</text>
   <text x="700" y="240" font-size="28" font-family="Ubuntu" fill="#111">➤ Choisissez le prochain coup !</text>
   <text x="700" y="280" font-size="22" font-family="Ubuntu" fill="#555">Tour : {tour}</text>
-  <rect x="680" y="295" width="580" height="380" fill="#fff" stroke="#d1d5db" stroke-width="1" rx="8" ry="8"/>
+  <rect x="680" y="295" width="575" height="380" fill="#fff" stroke="#d1d5db" stroke-width="1" rx="8" ry="8"/>
   <text x="700" y="330" font-size="24" font-family="Ubuntu" fill="#1f2937" font-weight="bold">☰ Historique des coups :</text>
   {historique_svg}
   <text x="750" y="700" font-size="25" font-family="Ubuntu" fill="#1f2937" font-weight="bold">Chaîne YOUTUBE : PriseEnPassant</text>
