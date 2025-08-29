@@ -40,31 +40,33 @@ def san_to_french(san: str) -> str:
         san = san.replace(eng, fr)
     return san
 
-# --- Couleurs échiquier + flèche ---
-def _force_board_colors(svg_str, light="#ebf0f7", dark="#6095df"):
+# --- Couleurs échiquier + flèche + surbrillance du dernier coup ---
+def _force_board_colors(svg_str, light="#ebf0f7", dark="#6095df", highlight="#305080"):
+    # Cases standard
     svg_str = re.sub(r'(\.square\.light\s*\{\s*fill:\s*)#[0-9a-fA-F]{3,6}', r'\1' + light, svg_str)
     svg_str = re.sub(r'(\.square\.dark\s*\{\s*fill:\s*)#[0-9a-fA-F]{3,6}', r'\1' + dark, svg_str)
-    svg_str = re.sub(r'(<rect[^>]*class="square light"[^>]*?)\s*fill="[^"]+"', r'\1', svg_str)
-    svg_str = re.sub(r'(<rect[^>]*class="square dark"[^>]*?)\s*fill="[^"]+"', r'\1', svg_str)
-    svg_str = re.sub(r'(<rect[^>]*class="square light"[^>]*)(/?>)', rf'\1 fill="{light}"\2', svg_str)
-    svg_str = re.sub(r'(<rect[^>]*class="square dark"[^>]*)(/?>)', rf'\1 fill="{dark}"\2', svg_str)
 
+    # Injection style CSS
     svg_str = re.sub(
         r'(<svg[^>]*>)',
         r'''\1<style>
             .square.light{fill:''' + light + r''' !important}
             .square.dark{fill:''' + dark + r''' !important}
-            .arrow{fill:red;stroke:red;stroke-width:3;opacity:0.6;stroke-linecap:round;}
+            .lastmove{fill:''' + highlight + r''' !important; opacity:0.85;}
+            .arrow{fill:none;stroke:red;stroke-width:2;opacity:0.7;stroke-linecap:round;}
         </style>''',
         svg_str, count=1
     )
+
+    # Flèche custom : fine et élégante
     svg_str = svg_str.replace(
         '<marker id="arrowhead"',
-        '<marker id="arrowhead" markerWidth="8" markerHeight="6" refX="6" refY="4" orient="auto">'
+        '<marker id="arrowhead" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">'
     ).replace(
         '<polygon points="0,0 10,3.5 0,7"',
-        '<path d="M1,1 Q0,4 1,7 L10,4 Z"'
+        '<path d="M1,1 Q0,3 1,5 L8,3 Z"'
     )
+
     return svg_str
 
 # --- Charger historique ---
