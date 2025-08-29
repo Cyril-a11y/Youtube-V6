@@ -139,59 +139,19 @@ jobs:
               encoding="utf-8"
           )
 
-          # === Historique ===
-          try:
-              coup_blanc_file = data_dir / "coup_blanc.txt"
-              dernier_coup_blanc = coup_blanc_file.read_text(encoding="utf-8").strip() if coup_blanc_file.exists() else None
-
-              coup_noir_uci = None
-              ap = requests.get(
-                  "https://lichess.org/api/account/playing",
-                  headers={"Authorization": f"Bearer {token}"},
-                  timeout=15
-              )
-              if ap.status_code == 200:
-                  j = ap.json()
-                  for g in j.get("nowPlaying", []):
-                      if g.get("gameId") == game_id:
-                          coup_noir_uci = g.get("lastMove")
-                          break
-
-              dernier_coup_noir = coup_noir_uci
-              try:
-                  if coup_noir_uci:
-                      tmp_board = chess.Board(fen_after_local)
-                      tmp_board.pop()
-                      move_obj = chess.Move.from_uci(coup_noir_uci)
-                      dernier_coup_noir = tmp_board.san(move_obj)
-              except Exception:
-                  pass
-
-              move_number = board.fullmove_number
-              if dernier_coup_blanc and dernier_coup_noir:
-                  line = f"{move_number}. {dernier_coup_blanc} {dernier_coup_noir}\n"
-              elif dernier_coup_noir:
-                  line = f"{move_number}... {dernier_coup_noir}\n"
-              else:
-                  line = f"{move_number}. ? ?\n"
-
-              with open(data_dir / "historique.txt", "a", encoding="utf-8") as f:
-                  f.write(line)
-
-              print(f"✅ historique.txt mis à jour: {line.strip()}")
-          except Exception as e:
-              print(f"❌ Erreur mise à jour historique.txt: {e}")
-
-          # Mise à jour move_history.json
+          # === Mise à jour move_history.json robuste ===
           history_file = data_dir / "move_history.json"
-          history = []
-          if history_file.exists():
-              try:
-                  parsed = json.loads(history_file.read_text(encoding="utf-8"))
-                  if isinstance(parsed, list):
-                      history = parsed
-              except Exception:
-                  pass
+          try:
+              if history_file.exists():
+                  history = json.loads(history_file.read_text(encoding="utf-8"))
+                  if not isinstance(history, list):
+                      print("⚠️ move_history.json n'est pas une liste → réinitialisé")
+                      history = []
+              else:
+                  history = []
+          except Exception as e:
+              print(f"⚠️ Erreur lecture move_history.json: {e} → réinitialisé")
+              history = []
 
           entry = {
               "couleur": "noir",
@@ -200,11 +160,12 @@ jobs:
               "horodatage": datetime.now(timezone.utc).isoformat()
           }
           history.append(entry)
+
           history_file.write_text(
               json.dumps(history, ensure_ascii=False, indent=2),
               encoding="utf-8"
           )
-          print("✅ move_history.json mis à jour (coup noir consigné)")
+          print(f"✅ Coup noir ajouté à move_history.json ({uci_move})")
           PY
 
           python3 play_move.py
@@ -214,8 +175,8 @@ jobs:
         run: |
           echo "=== LS DATA ==="
           ls -la data
-          echo "=== CONTENU historique.txt ==="
-          cat data/historique.txt || echo "❌ historique.txt introuvable"
+          echo "=== CONTENU move_history.json ==="
+          cat data/move_history.json || echo "❌ move_history.json introuvable"
           echo "=== GIT STATUS ==="
           git status --short
 
@@ -231,7 +192,8 @@ jobs:
           fi
 
           git add -f data/coup_blanc.txt
-          git add data/position.fen data/dernier_coup.json data/move_history.json data/historique.txt || true
+          git add -f data/move_history.json
+          git add -f data/position.fen data/dernier_coup.json || true
 
           git diff --cached --quiet || git commit -m "MAJ après coup noir"
 
