@@ -15,7 +15,7 @@ R . B . K B N R</pre></desc><defs><g id="white-pawn" class="white pawn"><path d=
   <text x="700" y="200" font-size="26" font-family="Ubuntu" fill="#111">Dernier coup : d5</text>
   <text x="700" y="240" font-size="28" font-family="Ubuntu" fill="#111">➤ Choisissez le prochain coup !</text>
   <text x="700" y="280" font-size="22" font-family="Ubuntu" fill="#555">Tour : 5</text>
-  <rect x="680" y="295" width="575" height="380" fill="#fff" stroke="#d1d5db" stroke-width="1" rx="8" ry="8"/>
+  <rect x="680" y="295" width="580" height="375" fill="#fff" stroke="#d1d5db" stroke-width="1" rx="8" ry="8"/>
   <text x="693" y="330" font-size="24" font-family="Ubuntu" fill="#1f2937" font-weight="bold">☰ Historique des coups :</text>
   <text x="700" y="370" font-size="15" font-family="Ubuntu" fill="#333"><tspan fill="red" font-weight="bold">1.</tspan> d4 Cf6 <tspan fill="red" font-weight="bold">2.</tspan> c4 e6 <tspan fill="red" font-weight="bold">3.</tspan> Cc3 Fb4 <tspan fill="red" font-weight="bold">4.</tspan> Db3 Cc6 <tspan fill="red" font-weight="bold">5.</tspan> e3 <tspan>d5</tspan></text>
   <text x="750" y="700" font-size="25" font-family="Ubuntu" fill="#1f2937" font-weight="bold">Chaîne YOUTUBE : PriseEnPassant</text>
