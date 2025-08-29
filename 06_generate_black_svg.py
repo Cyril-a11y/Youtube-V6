@@ -29,44 +29,16 @@ NOM_NOIRS = f"Stockfish {ELO_APPROX} Elo"
 
 # --- Conversion SAN en notation française ---
 def san_to_french(san: str) -> str:
-    mapping = {
-        "K": "R",  # King → Roi
-        "Q": "D",  # Queen → Dame
-        "R": "T",  # Rook → Tour
-        "B": "F",  # Bishop → Fou
-        "N": "C",  # Knight → Cavalier
-    }
+    mapping = {"K": "R", "Q": "D", "R": "T", "B": "F", "N": "C"}
     for eng, fr in mapping.items():
         san = san.replace(eng, fr)
     return san
 
-# --- Couleurs échiquier + flèche + surbrillance du dernier coup ---
+# (On garde la fonction ci-dessous au cas où, mais on ne s’en sert plus pour lastmove/arrow)
 def _force_board_colors(svg_str, light="#ebf0f7", dark="#6095df", highlight="#305080"):
-    # Cases standard
+    # Harmonisation des cases si besoin (pas de .lastmove / .arrow ici)
     svg_str = re.sub(r'(\.square\.light\s*\{\s*fill:\s*)#[0-9a-fA-F]{3,6}', r'\1' + light, svg_str)
     svg_str = re.sub(r'(\.square\.dark\s*\{\s*fill:\s*)#[0-9a-fA-F]{3,6}', r'\1' + dark, svg_str)
-
-    # Injection style CSS
-    svg_str = re.sub(
-        r'(<svg[^>]*>)',
-        r'''\1<style>
-            .square.light{fill:''' + light + r''' !important}
-            .square.dark{fill:''' + dark + r''' !important}
-            .lastmove{fill:''' + highlight + r''' !important}
-            .arrow{fill:red;stroke:red;stroke-width:3;opacity:1;stroke-linecap:round;}
-        </style>''',
-        svg_str, count=1
-    )
-
-    # Flèche custom : nette et bien proportionnée
-    svg_str = svg_str.replace(
-        '<marker id="arrowhead"',
-        '<marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">'
-    ).replace(
-        '<polygon points="0,0 10,3.5 0,7"',
-        '<path d="M1,1 Q0,3.5 1,6 L9,3.5 Z"'
-    )
-
     return svg_str
 
 # --- Charger historique ---
@@ -92,7 +64,7 @@ history = load_history_json()
 board_tmp = chess.Board()
 moves_san, last_move_uci = [], None
 
-if history:  # ✅ utiliser move_history.json
+if history:
     for entry in history:
         try:
             move = chess.Move.from_uci(entry["coup"])
@@ -103,7 +75,7 @@ if history:  # ✅ utiliser move_history.json
             last_move_uci = entry["coup"]
         except Exception:
             continue
-else:  # 🔄 fallback sur historique.txt
+else:
     moves_txt = load_history_txt()
     for uci in moves_txt:
         try:
@@ -123,8 +95,11 @@ fen = None
 token = os.getenv("LICHESS_BOT_TOKEN")
 if token:
     try:
-        resp = requests.get("https://lichess.org/api/account/playing",
-                            headers={"Authorization": f"Bearer {token}"}, timeout=10)
+        resp = requests.get(
+            "https://lichess.org/api/account/playing",
+            headers={"Authorization": f"Bearer {token}"},
+            timeout=10
+        )
         if resp.status_code == 200:
             data = resp.json()
             games = data.get("nowPlaying", [])
@@ -140,15 +115,37 @@ if not fen:
 board = chess.Board(fen)
 last_move_obj = chess.Move.from_uci(last_move_uci) if last_move_uci else None
 
-# --- SVG échiquier ---
+# --- SVG échiquier (style officiel python-chess) ---
+arrow = chess.svg.Arrow(
+    last_move_obj.from_square, last_move_obj.to_square, color="red"
+) if last_move_obj else None
+
+# Couleurs documentées (clé -> couleur)
+colors = {
+    "square light": "#ebf0f7",
+    "square dark": "#6095df",
+    "square light lastmove": "#305080",  # surbrillance claire du dernier coup
+    "square dark lastmove":  "#305080",  # surbrillance sombre du dernier coup
+    "arrow red": "#ff0000",              # teinte de l'arrow 'red'
+}
+
+# On peut remplir explicitement la case d'arrivée pour forcer un rendu plus foncé
+fill = {}
+if last_move_obj:
+    fill[last_move_obj.to_square] = "#27466b"  # foncé, opaque
+
 svg_echiquier = chess.svg.board(
     board=board,
     orientation=chess.WHITE,
     size=620,
     lastmove=last_move_obj,
-    arrows=[(last_move_obj.from_square, last_move_obj.to_square)] if last_move_obj else []
+    arrows=[arrow] if arrow else [],
+    colors=colors,
+    fill=fill
 )
-svg_echiquier = _force_board_colors(svg_echiquier)
+
+# (Optionnel) Si tu veux encore forcer tes couleurs de cases de base :
+# svg_echiquier = _force_board_colors(svg_echiquier)
 
 # --- Historique formaté ---
 def format_history_lines(moves, dernier):
