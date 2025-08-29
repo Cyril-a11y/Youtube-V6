@@ -28,7 +28,7 @@ except Exception:
 NOM_BLANCS = "Communauté PriseEnPassant"
 NOM_NOIRS = f"Stockfish {ELO_APPROX} Elo"
 
-# --- Couleurs échiquier ---
+# --- Couleurs échiquier + design flèche ---
 def _force_board_colors(svg_str, light="#ebf0f7", dark="#6095df"):
     svg_str = re.sub(r'(\.square\.light\s*\{\s*fill:\s*)#[0-9a-fA-F]{3,6}', r'\1' + light, svg_str)
     svg_str = re.sub(r'(\.square\.dark\s*\{\s*fill:\s*)#[0-9a-fA-F]{3,6}', r'\1' + dark, svg_str)
@@ -36,13 +36,33 @@ def _force_board_colors(svg_str, light="#ebf0f7", dark="#6095df"):
     svg_str = re.sub(r'(<rect[^>]*class="square dark"[^>]*?)\s*fill="[^"]+"', r'\1', svg_str)
     svg_str = re.sub(r'(<rect[^>]*class="square light"[^>]*)(/?>)', rf'\1 fill="{light}"\2', svg_str)
     svg_str = re.sub(r'(<rect[^>]*class="square dark"[^>]*)(/?>)', rf'\1 fill="{dark}"\2', svg_str)
+
+    # Style custom flèche : épaisse, rouge, base arrondie, refX=6 pour ne pas dépasser
     svg_str = re.sub(
         r'(<svg[^>]*>)',
-        r'\1<style>.square.light{fill:' + light +
-        r' !important}.square.dark{fill:' + dark +
-        r' !important}.arrow{fill:red;stroke:red;stroke-width:2;opacity:0.6;stroke-linecap:round}</style>',  # 🔴 plus fine + arrondie
+        r'''\1<style>
+            .square.light{fill:''' + light + r''' !important}
+            .square.dark{fill:''' + dark + r''' !important}
+            .arrow{
+                fill:red;
+                stroke:red;
+                stroke-width:3;
+                opacity:0.6;
+                stroke-linecap:round;
+            }
+        </style>''',
         svg_str, count=1
     )
+
+    # On insère notre marker personnalisé
+    svg_str = svg_str.replace(
+        '<marker id="arrowhead"',
+        '<marker id="arrowhead" markerWidth="12" markerHeight="8" refX="6" refY="4" orient="auto">'
+    ).replace(
+        '<polygon points="0,0 10,3.5 0,7"',
+        '<path d="M1,1 Q0,4 1,7 L10,4 Z"'
+    )
+
     return svg_str
 
 # --- Historique ---
@@ -110,7 +130,7 @@ def format_history_lines(moves, dernier):
             coup_blanc = f'<tspan fill="red">{coup_blanc}</tspan>'
         if coup_noir == dernier:
             coup_noir = f'<tspan fill="red">{coup_noir}</tspan>'
-        # 🔴 numéro du coup en rouge et gras
+        # numéro en rouge et gras
         lignes.append(f'<tspan fill="red" font-weight="bold">{num}.</tspan> {coup_blanc} {coup_noir}')
     lignes_split = []
     for j in range(0, len(lignes), 5):
