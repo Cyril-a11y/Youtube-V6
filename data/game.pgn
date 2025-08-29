@@ -1,21 +1,21 @@
 [Event "casual correspondence game"]
-[Site "https://lichess.org/7PGi2006"]
+[Site "https://lichess.org/sJZa0jNN"]
 [Date "2025.08.29"]
 [White "PriseEnPassantYT"]
 [Black "PriseEnPassantBot"]
 [Result "*"]
-[GameId "7PGi2006"]
+[GameId "sJZa0jNN"]
 [UTCDate "2025.08.29"]
-[UTCTime "20:39:42"]
+[UTCTime "21:26:23"]
 [WhiteElo "1500"]
 [BlackElo "2000"]
 [BlackTitle "BOT"]
 [Variant "Standard"]
 [TimeControl "-"]
-[ECO "B12"]
-[Opening "Caro-Kann Defense"]
+[ECO "A40"]
+[Opening "Queen's Pawn Game"]
 [Termination "Unterminated"]
 
-1. e4 c6 2. d4 d6 3. c4 *
+1. d4 *
 
 
