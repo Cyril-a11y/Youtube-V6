@@ -36,7 +36,6 @@ def san_to_french(san: str) -> str:
 
 # (On garde la fonction ci-dessous au cas où, mais on ne s’en sert plus pour lastmove/arrow)
 def _force_board_colors(svg_str, light="#ebf0f7", dark="#6095df", highlight="#305080"):
-    # Harmonisation des cases si besoin (pas de .lastmove / .arrow ici)
     svg_str = re.sub(r'(\.square\.light\s*\{\s*fill:\s*)#[0-9a-fA-F]{3,6}', r'\1' + light, svg_str)
     svg_str = re.sub(r'(\.square\.dark\s*\{\s*fill:\s*)#[0-9a-fA-F]{3,6}', r'\1' + dark, svg_str)
     return svg_str
@@ -120,16 +119,14 @@ arrow = chess.svg.Arrow(
     last_move_obj.from_square, last_move_obj.to_square, color="red"
 ) if last_move_obj else None
 
-# Couleurs documentées (clé -> couleur)
 colors = {
     "square light": "#ebf0f7",
     "square dark": "#6095df",
-    "square light lastmove": "#305080",  # surbrillance claire du dernier coup
-    "square dark lastmove":  "#305080",  # surbrillance sombre du dernier coup
-    "arrow red": "#ff0000",              # teinte de l'arrow 'red'
+    "square light lastmove": "#305080",
+    "square dark lastmove": "#305080",
+    "arrow red": "#ff0000",
 }
 
-# On peut remplir explicitement la case d'arrivée pour forcer un rendu plus foncé
 fill = {}
 if last_move_obj:
     fill[last_move_obj.to_square] = "#2b4e76"  # foncé, opaque
@@ -144,8 +141,17 @@ svg_echiquier = chess.svg.board(
     fill=fill
 )
 
-# (Optionnel) Si tu veux encore forcer tes couleurs de cases de base :
-# svg_echiquier = _force_board_colors(svg_echiquier)
+# Ajustement fin de la flèche : tige fine, opacité 0.8, triangle base plus étroite
+svg_echiquier = svg_echiquier.replace(
+    '<marker id="arrowhead"',
+    '<marker id="arrowhead" markerWidth="9" markerHeight="6" refX="8" refY="3" orient="auto">'
+).replace(
+    '<polygon points="0,0 10,3.5 0,7"',
+    '<polygon points="0,0 7,3.5 0,7"'
+).replace(
+    'stroke-width="3"',
+    'stroke-width="2.2" opacity="0.8"'
+)
 
 # --- Historique formaté ---
 def format_history_lines(moves, dernier):
