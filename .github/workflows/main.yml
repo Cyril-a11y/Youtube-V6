@@ -130,26 +130,38 @@ jobs:
           echo "⏳ Pause 60s pour s'assurer que le coup noir est bien enregistré..."
           sleep 60
 
-      # 15) Generate black SVG & PNG
-      - name: Generate black SVG & PNG
-        run: python 06_generate_black_svg.py
-        continue-on-error: true
-
-      # 16) Commit all updated game data (one final commit for everything)
-      - name: Commit final game data
+      # 15) Commit all updated game data (avant SVG)
+      - name: Commit all game data before SVG
         run: |
           git config user.name "github-actions"
           git config user.email "actions@github.com"
 
-          # Ajoute absolument tout le contenu de data/ (ajouts, suppressions, modifs)
           git add -A data/ || true
           git restore --staged .github/workflows || true
           git checkout -- .github/workflows || true
 
-          echo "=== DEBUG git status (final commit) ==="
+          echo "=== DEBUG git status (pre-SVG commit) ==="
           git status --short
 
-          git commit -m "Update all game data [skip ci]" || echo "No changes"
+          git commit -m "Update game data before SVG [skip ci]" || echo "No changes"
+          git pull --rebase origin main || true
+          git push origin HEAD:main
 
+      # 16) Generate black SVG & PNG (sera basé sur les données à jour)
+      - name: Generate black SVG & PNG
+        run: python 06_generate_black_svg.py
+        continue-on-error: true
+
+      # 17) Commit SVG & PNG final
+      - name: Commit final SVG & PNG
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+
+          git add -f data/thumbnail_black.svg data/thumbnail_black.png || true
+          git restore --staged .github/workflows || true
+          git checkout -- .github/workflows || true
+
+          git commit -m "Update SVG & PNG thumbnail [skip ci]" || echo "No changes"
           git pull --rebase origin main || true
           git push origin HEAD:main
