@@ -126,7 +126,6 @@ jobs:
           print(f"📤 POST {url} -> {r.status_code} {r.text}")
           if r.status_code != 200:
               print(f"⚠️ Coup envoyé mais réponse non-200: {r.status_code} {r.text}")
-              # On continue quand même
 
           # Sauvegarde FEN + dernier coup lisible
           fen_after_local = board.fen()
@@ -140,7 +139,7 @@ jobs:
               encoding="utf-8"
           )
 
-          # === Historique: coup blanc depuis fichier + coup noir depuis lastMove ===
+          # === Historique ===
           try:
               coup_blanc_file = data_dir / "coup_blanc.txt"
               dernier_coup_blanc = coup_blanc_file.read_text(encoding="utf-8").strip() if coup_blanc_file.exists() else None
@@ -179,7 +178,7 @@ jobs:
               with open(data_dir / "historique.txt", "a", encoding="utf-8") as f:
                   f.write(line)
 
-              print(f"✅ historique.txt mis à jour (nouvelle logique): {line.strip()}")
+              print(f"✅ historique.txt mis à jour: {line.strip()}")
           except Exception as e:
               print(f"❌ Erreur mise à jour historique.txt: {e}")
 
@@ -220,11 +219,16 @@ jobs:
           echo "=== GIT STATUS ==="
           git status --short
 
-      # 4) Commit & push (force direct, pas de rebase)
+      # 4) Commit & push
       - name: Commit & Push changes
         run: |
           git config user.name "github-actions"
           git config user.email "actions@github.com"
-          git add data/position.fen data/dernier_coup.json data/move_history.json data/historique.txt || true
+
+          # Inclure coup_blanc.txt pour éviter sa suppression
+          git add data/position.fen data/dernier_coup.json data/move_history.json data/historique.txt data/coup_blanc.txt || true
+
           git diff --cached --quiet || git commit -m "MAJ après coup noir"
-          git push origin main --force
+
+          git pull --rebase origin main || true
+          git push origin main
