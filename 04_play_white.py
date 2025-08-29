@@ -175,5 +175,3 @@ if __name__ == "__main__":
     pgn_after = download_pgn(game_id)
     if pgn_after:
         PGN_FILE.write_text(pgn_after, encoding="utf-8")
-
-    COUP_BLANCS_FILE.unlink(missing_ok=True)
