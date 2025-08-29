@@ -132,7 +132,7 @@ colors = {
 # On peut remplir explicitement la case d'arrivée pour forcer un rendu plus foncé
 fill = {}
 if last_move_obj:
-    fill[last_move_obj.to_square] = "#27466b"  # foncé, opaque
+    fill[last_move_obj.to_square] = "#2b4e76"  # foncé, opaque
 
 svg_echiquier = chess.svg.board(
     board=board,
