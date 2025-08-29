@@ -156,8 +156,8 @@ def format_history_lines(moves, dernier):
         num = i + 1
         coup_blanc = moves[i*2] if i*2 < len(moves) else "—"
         coup_noir = moves[i*2+1] if i*2+1 < len(moves) else "—"
-        if coup_blanc == dernier: coup_blanc = f'<tspan fill="red">{coup_blanc}</tspan>'
-        if coup_noir == dernier: coup_noir = f'<tspan fill="red">{coup_noir}</tspan>'
+        if coup_blanc == dernier: coup_blanc = f'<tspan>{coup_blanc}</tspan>'
+        if coup_noir == dernier: coup_noir = f'<tspan>{coup_noir}</tspan>'
         lignes.append(f'<tspan fill="red" font-weight="bold">{num}.</tspan> {coup_blanc} {coup_noir}')
     return [" ".join(lignes[j:j+5]) for j in range(0, len(lignes), 5)]
 
