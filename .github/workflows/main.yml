@@ -87,6 +87,20 @@ jobs:
         run: python 04_play_white.py
         continue-on-error: true
 
+      # 10bis) Commit fichiers après coup blanc
+      - name: Commit white move data
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+
+          git add -f data/move_history.json data/dernier_coup.json data/position.fen || true
+          git restore --staged .github/workflows || true
+          git checkout -- .github/workflows || true
+
+          git commit -m "Update white move data [skip ci]" || echo "No changes"
+          git pull --rebase origin main || true
+          git push origin HEAD:main
+
       # 11) Delay after white move
       - name: Delay after white move
         run: sleep 1
