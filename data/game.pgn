@@ -1,21 +1,21 @@
 [Event "casual correspondence game"]
-[Site "https://lichess.org/sJZa0jNN"]
-[Date "2025.08.29"]
+[Site "https://lichess.org/MYgbUKB4"]
+[Date "2025.08.30"]
 [White "PriseEnPassantYT"]
 [Black "PriseEnPassantBot"]
 [Result "*"]
-[GameId "sJZa0jNN"]
-[UTCDate "2025.08.29"]
-[UTCTime "21:26:23"]
+[GameId "MYgbUKB4"]
+[UTCDate "2025.08.30"]
+[UTCTime "06:30:23"]
 [WhiteElo "1500"]
 [BlackElo "2000"]
 [BlackTitle "BOT"]
 [Variant "Standard"]
 [TimeControl "-"]
-[ECO "E22"]
-[Opening "Nimzo-Indian Defense: Spielmann Variation"]
+[ECO "B00"]
+[Opening "King's Pawn Game"]
 [Termination "Unterminated"]
 
-1. d4 Nf6 2. c4 e6 3. Nc3 Bb4 4. Qb3 Nc6 *
+1. e4 *
 
 
